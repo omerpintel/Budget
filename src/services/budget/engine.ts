@@ -1,0 +1,175 @@
+/**
+ * Pure rollover maths for one budget period. No database access, so the arithmetic
+ * can be property-tested directly.
+ *
+ * Money is integer agorot throughout; nothing here may introduce a fraction.
+ */
+
+export type WalletKey = 'joint' | 'savings' | { personal: string };
+
+export interface Transfer {
+  from: WalletKey;
+  to: WalletKey;
+  amount: number;
+}
+
+export interface PeriodInput {
+  opening: {
+    joint: number;
+    savings: number;
+    personal: Record<string, number>;
+  };
+  actual: {
+    income: number;
+    fixed: number;
+    /** Joint flexible spending, excluding anything funded from savings. */
+    jointFlexible: number;
+    personalSpent: Record<string, number>;
+    /** Big expenses explicitly drawn from the savings buffer. */
+    savingsFunded: number;
+  };
+  plan: {
+    /** Funded to each person regardless of what they actually spend. */
+    allowances: Record<string, number>;
+    /** Monthly contribution moved from the joint pot into savings. */
+    savings: number;
+  };
+  transfers: Transfer[];
+}
+
+export interface WalletMovement {
+  opening: number;
+  inflow: number;
+  outflow: number;
+  delta: number;
+  closing: number;
+}
+
+export interface PeriodResult {
+  joint: WalletMovement;
+  savings: WalletMovement;
+  personal: Record<string, WalletMovement>;
+  /** Positive when the joint buffer ends below zero. */
+  shortfall: number;
+}
+
+function keyOf(wallet: WalletKey): string {
+  return typeof wallet === 'string' ? wallet : `personal:${wallet.personal}`;
+}
+
+function movement(opening: number, inflow: number, outflow: number): WalletMovement {
+  const delta = inflow - outflow;
+  return { opening, inflow, outflow, delta, closing: opening + delta };
+}
+
+export function computePeriod(input: PeriodInput): PeriodResult {
+  const transferIn = new Map<string, number>();
+  const transferOut = new Map<string, number>();
+  for (const t of input.transfers) {
+    if (t.amount <= 0) continue;
+    const from = keyOf(t.from);
+    const to = keyOf(t.to);
+    transferOut.set(from, (transferOut.get(from) ?? 0) + t.amount);
+    transferIn.set(to, (transferIn.get(to) ?? 0) + t.amount);
+  }
+  const inOf = (key: string) => transferIn.get(key) ?? 0;
+  const outOf = (key: string) => transferOut.get(key) ?? 0;
+
+  const people = new Set([
+    ...Object.keys(input.opening.personal),
+    ...Object.keys(input.plan.allowances),
+    ...Object.keys(input.actual.personalSpent),
+  ]);
+
+  const allowanceTotal = [...people].reduce(
+    (sum, id) => sum + (input.plan.allowances[id] ?? 0),
+    0,
+  );
+
+  // Allowances and the savings contribution leave the joint pot the moment the
+  // period is planned, whether or not they are spent. That is what makes personal
+  // money genuinely guilt-free.
+  const joint = movement(
+    input.opening.joint,
+    input.actual.income + inOf('joint'),
+    input.actual.fixed +
+      input.actual.jointFlexible +
+      allowanceTotal +
+      input.plan.savings +
+      outOf('joint'),
+  );
+
+  const savings = movement(
+    input.opening.savings,
+    input.plan.savings + inOf('savings'),
+    input.actual.savingsFunded + outOf('savings'),
+  );
+
+  const personal: Record<string, WalletMovement> = {};
+  for (const id of people) {
+    const key = `personal:${id}`;
+    personal[id] = movement(
+      input.opening.personal[id] ?? 0,
+      (input.plan.allowances[id] ?? 0) + inOf(key),
+      (input.actual.personalSpent[id] ?? 0) + outOf(key),
+    );
+  }
+
+  return {
+    joint,
+    savings,
+    personal,
+    shortfall: joint.closing < 0 ? -joint.closing : 0,
+  };
+}
+
+/** Opening balances for the next period are simply this period's closings. */
+export function nextOpening(result: PeriodResult): PeriodInput['opening'] {
+  return {
+    joint: result.joint.closing,
+    savings: result.savings.closing,
+    personal: Object.fromEntries(
+      Object.entries(result.personal).map(([id, m]) => [id, m.closing]),
+    ),
+  };
+}
+
+export interface PlanLine {
+  categoryId: string;
+  planned: number;
+}
+
+/**
+ * Zero-based check: every shekel of income must be given a job, whether that is a
+ * category, someone's allowance, or savings.
+ */
+export function leftToAssign(
+  income: number,
+  lines: PlanLine[],
+  allowances: Record<string, number>,
+): number {
+  const assigned =
+    lines.reduce((sum, l) => sum + l.planned, 0) +
+    Object.values(allowances).reduce((sum, a) => sum + a, 0);
+  return income - assigned;
+}
+
+export interface CategoryVariance {
+  categoryId: string;
+  planned: number;
+  actual: number;
+  /** Negative means overspent. */
+  delta: number;
+}
+
+export function computeVariance(
+  lines: PlanLine[],
+  actuals: Record<string, number>,
+): CategoryVariance[] {
+  const ids = new Set([...lines.map((l) => l.categoryId), ...Object.keys(actuals)]);
+  return [...ids].map((categoryId) => {
+    const planned = lines.find((l) => l.categoryId === categoryId)?.planned ?? 0;
+    const actual = actuals[categoryId] ?? 0;
+    return { categoryId, planned, actual, delta: planned - actual };
+  });
+}
