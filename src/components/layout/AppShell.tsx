@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Receipt,
   Settings as SettingsIcon,
-  Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PeriodSwitcher } from './PeriodSwitcher';
@@ -13,7 +12,6 @@ const NAV = [
   { to: '/', label: 'מרכז', icon: LayoutDashboard, end: true },
   { to: '/run', label: 'סגירת חודש', icon: CalendarClock },
   { to: '/transactions', label: 'תנועות', icon: Receipt },
-  { to: '/budget', label: 'תקציב', icon: Wallet },
 ];
 
 const LINK =

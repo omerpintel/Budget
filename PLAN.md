@@ -79,6 +79,14 @@ Rust 1.98.1 (stable-x86_64-pc-windows-msvc) installed.
 GitHub repo: https://github.com/omerpintel/Budget.git
 
 ### M12 categories + allocation facts
+- **Nav is four items**: מרכז · סגירת חודש · תנועות · הגדרות. The תקציב tab was deleted because it
+  had become a near-total duplicate of the wizard — same `AllocationPlanner`, same income editor,
+  same wallet cards, same commit button. Its only two unique features, **general wallet transfers**
+  and **reopen a locked month**, moved into the התאמה step. `/budget` redirects to `/run`.
+- `features/budget/TransfersCard.tsx` was lifted out of the old budget page and now loads its own
+  data, so the wizard can drop it in without prop plumbing.
+- **מרכז is the read-only budget view**: it lists every category with a plan, grouped by kind,
+  showing נותר plus actual-of-planned. Editing lives only in the wizard's שיוך step.
 - **Monthly Run is 5 steps now**: בנק · ייבוא · מיון · שיוך · התאמה. `FINAL_STEP` in `runModel.ts`
   is derived from `RUN_STEPS.length`, so never hard-code the last index again.
   `deriveStep` intentionally stops at שיוך (3) rather than running on to התאמה: allocation is a

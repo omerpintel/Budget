@@ -16,7 +16,7 @@ import { ImportHistory } from '@/features/import/ImportHistory';
 import { listWallets } from '@/data/wallets';
 import { listPeople } from '@/data/people';
 import { findPeriod } from '@/data/periods';
-import { listBudgetLines } from '@/data/budget';
+import { listAllocationLines } from '@/data/budget';
 import { buildInsights, type InsightBundle } from '@/data/insights';
 import type { Anomaly } from '@/services/insights/anomalies';
 import { loadActuals, recomputeFrom } from '@/data/periodEngine';
@@ -25,6 +25,12 @@ import { getSetting, SETTING_KEYS } from '@/data/settings';
 import { formatAgorot, periodLabel } from '@/lib/money';
 import { usePeriod } from '@/state/period';
 import { cn } from '@/lib/utils';
+
+const KIND_LABELS: Record<'fixed' | 'flexible' | 'savings', string> = {
+  fixed: 'הוצאות קבועות',
+  flexible: 'הוצאות משתנות',
+  savings: 'חיסכון',
+};
 
 function nextRunDate(closeDay: number): Date {
   const now = new Date();
@@ -50,7 +56,7 @@ export function DashboardPage() {
 
       const [result, lines, actuals, status, insights] = await Promise.all([
         recomputeFrom(current.id),
-        listBudgetLines(current.id),
+        listAllocationLines(current.id),
         loadActuals(current.id),
         getRunStatus(current.id),
         buildInsights(current.id),
@@ -101,7 +107,8 @@ export function DashboardPage() {
   }
 
   const { result, lines, actuals, status } = data;
-  const flexible = (lines ?? []).filter((l) => l.kind === 'flexible');
+  // Only categories with a plan; the rest would be a wall of zeroes on a read-only view.
+  const budgeted = (lines ?? []).filter((l) => l.planned_amount > 0);
   const step = status ? deriveStep(status) : 0;
   const committed = status?.committed ?? false;
 
@@ -156,47 +163,74 @@ export function DashboardPage() {
       <div className="grid grid-cols-3 gap-4">
         <Card className="col-span-2">
           <CardHeader
-            title="הוצאות משתנות"
-            description="ממוין לפי כמה כל קטגוריה רחוקה מהתכנון שלה."
+            title="כמה נשאר בכל קטגוריה"
+            description="מתוכנן מול בפועל לחודש הזה. לעריכה — שלב השיוך בסגירת החודש."
+            action={
+              <Link to="/run" className="text-brand shrink-0 text-xs hover:underline">
+                עריכת התקציב
+              </Link>
+            }
           />
           <CardBody>
-            {flexible.length === 0 ? (
+            {budgeted.length === 0 ? (
               <p className="text-fg-subtle text-xs">
-                עדיין לא תוכננו קטגוריות משתנות. אפשר להגדיר אותן ב
-                <Link to="/budget" className="text-brand underline">
-                  עמוד התקציב
-                </Link>
-                .
+                עדיין לא הוקצה תקציב לחודש הזה. עבור לשלב{' '}
+                <Link to="/run" className="text-brand underline">
+                  השיוך בסגירת החודש
+                </Link>{' '}
+                כדי לחלק את ההכנסות לקטגוריות.
               </p>
             ) : (
-              <div className="space-y-2.5">
-                {[...flexible]
-                  .map((line) => ({ line, actual: actuals?.byCategory[line.category_id] ?? 0 }))
-                  .sort(
-                    (a, b) =>
-                      Math.abs(b.actual - b.line.planned_amount) -
-                      Math.abs(a.actual - a.line.planned_amount),
-                  )
-                  .map(({ line, actual }) => {
-                    const pct = line.planned_amount > 0 ? (actual / line.planned_amount) * 100 : 0;
-                    const over = actual > line.planned_amount;
-                    return (
-                      <div key={line.category_id}>
-                        <div className="mb-1 flex items-baseline justify-between text-xs">
-                          <span>{line.category_name}</span>
-                          <span className={cn('tnum', over ? 'text-negative' : 'text-fg-muted')}>
-                            {formatAgorot(actual)} מתוך {formatAgorot(line.planned_amount)}
-                          </span>
-                        </div>
-                        <div className="bg-surface-2 h-1.5 overflow-hidden rounded-full">
-                          <div
-                            className={cn('h-full rounded-full', over ? 'bg-negative' : 'bg-joint')}
-                            style={{ width: `${Math.min(pct, 100)}%` }}
-                          />
-                        </div>
+              <div className="space-y-4">
+                {(['fixed', 'flexible', 'savings'] as const).map((kind) => {
+                  const group = budgeted.filter((l) => l.kind === kind);
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={kind}>
+                      <div className="text-fg-subtle mb-2 text-[11px] font-medium">
+                        {KIND_LABELS[kind]}
                       </div>
-                    );
-                  })}
+                      <div className="space-y-2.5">
+                        {group.map((line) => {
+                          const actual = actuals?.byCategory[line.category_id] ?? 0;
+                          const pct =
+                            line.planned_amount > 0 ? (actual / line.planned_amount) * 100 : 0;
+                          const over = actual > line.planned_amount;
+                          const left = line.planned_amount - actual;
+                          return (
+                            <div key={line.category_id}>
+                              <div className="mb-1 flex items-baseline justify-between gap-3 text-xs">
+                                <span className="truncate">{line.category_name}</span>
+                                <span
+                                  className={cn(
+                                    'tnum shrink-0',
+                                    over ? 'text-negative' : 'text-fg-muted',
+                                  )}
+                                >
+                                  {over ? 'חריגה של ' : 'נותר '}
+                                  {formatAgorot(Math.abs(left))}
+                                  <span className="text-fg-subtle">
+                                    {' '}
+                                    · {formatAgorot(actual)} מתוך {formatAgorot(line.planned_amount)}
+                                  </span>
+                                </span>
+                              </div>
+                              <div className="bg-surface-2 h-1.5 overflow-hidden rounded-full">
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full',
+                                    over ? 'bg-negative' : 'bg-joint',
+                                  )}
+                                  style={{ width: `${Math.min(pct, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardBody>

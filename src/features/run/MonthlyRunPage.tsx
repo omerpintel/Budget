@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,6 +8,7 @@ import {
   CircleCheck,
   Copy,
   Lock,
+  LockOpen,
   Plus,
   Trash2,
 } from 'lucide-react';
@@ -25,6 +25,7 @@ import { TriagePage } from '@/features/triage/TriagePage';
 import { AutoCategorize } from '@/features/triage/AutoCategorize';
 import { ShortfallDialog } from '@/features/budget/ShortfallDialog';
 import { AllocationPlanner } from '@/features/budget/AllocationPlanner';
+import { TransfersCard } from '@/features/budget/TransfersCard';
 import { ensurePeriod, findPeriod } from '@/data/periods';
 import { listImportHistory } from '@/data/imports';
 import {
@@ -42,7 +43,7 @@ import {
   removeIncome,
   updateIncome,
 } from '@/data/budget';
-import { addTransfer, commitPeriod, loadActuals, recomputeFrom } from '@/data/periodEngine';
+import { addTransfer, commitPeriod, loadActuals, recomputeFrom, reopenPeriod } from '@/data/periodEngine';
 import { listWallets } from '@/data/wallets';
 import { listPeople } from '@/data/people';
 import { listCategories, listRecurringEntries } from '@/data/categories';
@@ -533,7 +534,18 @@ function ReconcileStep({
           title="מתוכנן מול בפועל"
           description="קטגוריות משתנות בלבד — אלה מה שהכרית המשותפת סופגת."
           action={
-            committed ? undefined : (
+            committed ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                  await reopenPeriod(periodId);
+                  onChanged();
+                }}
+              >
+                <LockOpen className="size-3.5" /> פתיחה מחדש
+              </Button>
+            ) : (
               <Button
                 size="sm"
                 onClick={async () => {
@@ -549,11 +561,8 @@ function ReconcileStep({
         <CardBody>
           {flexible.length === 0 ? (
             <p className="text-fg-subtle text-xs">
-              לא תוכננו קטגוריות משתנות. אפשר להגדיר אותן ב
-              <Link to="/budget" className="text-brand underline">
-                עמוד התקציב
-              </Link>{' '}
-              כדי להשוות מול הבפועל.
+              לא תוכננו קטגוריות משתנות. חזור לשלב השיוך כדי לתת 
+להן תקציב.
             </p>
           ) : (
             <div className="space-y-2.5">
@@ -582,6 +591,8 @@ function ReconcileStep({
           )}
         </CardBody>
       </Card>
+
+      <TransfersCard periodId={periodId} disabled={committed} />
     </div>
   );
 }

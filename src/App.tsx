@@ -17,9 +17,6 @@ const MonthlyRunPage = lazy(() =>
 const TransactionsPage = lazy(() =>
   import('@/pages/TransactionsPage').then((m) => ({ default: m.TransactionsPage })),
 );
-const BudgetPage = lazy(() =>
-  import('@/features/budget/BudgetPage').then((m) => ({ default: m.BudgetPage })),
-);
 const InsightsPage = lazy(() =>
   import('@/features/insights/InsightsPage').then((m) => ({ default: m.InsightsPage })),
 );
@@ -55,13 +52,13 @@ const router = createHashRouter([
       { index: true, element: page(<DashboardPage />) },
       { path: 'run', element: page(<MonthlyRunPage />) },
       { path: 'transactions', element: page(<TransactionsPage />) },
-      { path: 'budget', element: page(<BudgetPage />) },
       { path: 'settings', element: page(<SettingsPage />) },
       // Reached from the overview card rather than the sidebar, to keep the nav short.
       { path: 'insights', element: page(<InsightsPage />) },
-      // Folded into other screens; kept so old links and in-app redirects still land somewhere.
-      { path: 'import', element: <Navigate to="/run?step=1" replace /> },
-      { path: 'triage', element: <Navigate to="/run?step=2" replace /> },
+      // Folded into the wizard; kept so old links and in-app redirects still land somewhere.
+      { path: 'import', element: <Navigate to="/run" replace /> },
+      { path: 'triage', element: <Navigate to="/run" replace /> },
+      { path: 'budget', element: <Navigate to="/run" replace /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
