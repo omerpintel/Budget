@@ -125,6 +125,19 @@ export async function setTriageCategory(transactionId: string, categoryId: strin
   );
 }
 
+/** Lets a user move an auto-applied row between the joint wallet and a personal one. */
+export async function setTriageWallet(
+  transactionId: string,
+  wallet: WalletScope,
+  personId: string | null,
+): Promise<void> {
+  const isPersonal = wallet === 'personal';
+  await getDb().execute(
+    `UPDATE transactions SET wallet = ?, personal_person_id = ?, is_masked = ?, updated_at = ? WHERE id = ?`,
+    [wallet, isPersonal ? personId : null, isPersonal ? 1 : 0, nowIso(), transactionId],
+  );
+}
+
 /** Categories ordered by how often they have actually been used, for the number keys. */
 export async function getQuickCategories(limit = 9): Promise<Array<{ id: string; name: string }>> {
   return getDb().select<{ id: string; name: string }>(

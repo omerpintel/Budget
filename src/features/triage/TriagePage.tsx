@@ -23,6 +23,7 @@ import {
   getQuickCategories,
   loadTriage,
   setTriageCategory,
+  setTriageWallet,
   type TriageDecision,
   type TriageRow,
 } from '@/data/triage';
@@ -128,6 +129,13 @@ export function TriagePage({
 
   async function handleAutoCategoryChange(rowId: string, categoryId: string | null) {
     await setTriageCategory(rowId, categoryId);
+    await qc.invalidateQueries({ queryKey: ['triage'] });
+  }
+
+  async function handleAutoWalletToggle(row: TriageRow) {
+    if (!row.account_owner_id) return;
+    const nextWallet: WalletScope = row.wallet === 'personal' ? 'joint' : 'personal';
+    await setTriageWallet(row.id, nextWallet, nextWallet === 'personal' ? row.account_owner_id : null);
     await qc.invalidateQueries({ queryKey: ['triage'] });
   }
 
@@ -294,13 +302,38 @@ export function TriagePage({
               />
               {showAuto && (
                 <CardBody className="overflow-x-auto p-0">
-                  <table className="w-full min-w-[38rem] text-xs">
+                  <table className="w-full min-w-[44rem] text-xs">
                     <tbody>
                       {auto.map((row) => (
                         <tr key={row.id} className="border-line/60 border-t">
                           <td className="text-fg-muted w-24 px-4 py-2">{row.transaction_date}</td>
                           <td className="px-4 py-2">
                             <MerchantText value={row.raw_description} />
+                          </td>
+                          <td className="w-36 px-4 py-2">
+                            {row.account_owner_id ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleAutoWalletToggle(row)}
+                                className={cn(
+                                  'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] whitespace-nowrap transition-colors',
+                                  row.wallet === 'personal'
+                                    ? 'border-brand bg-brand/10 text-fg'
+                                    : 'border-line text-fg-muted hover:border-fg-subtle hover:bg-surface-2',
+                                )}
+                              >
+                                {row.wallet === 'personal' ? (
+                                  <Lock className="size-3" />
+                                ) : (
+                                  <User className="size-3" />
+                                )}
+                                {row.wallet === 'personal'
+                                  ? `אישי של ${row.account_owner_name ?? ''}`
+                                  : 'משותף'}
+                              </button>
+                            ) : (
+                              <span className="text-fg-subtle text-[11px]">משותף</span>
+                            )}
                           </td>
                           <td className="w-44 px-4 py-2">
                             <Select
