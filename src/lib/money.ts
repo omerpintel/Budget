@@ -1,5 +1,5 @@
 // Grouping is taken from en-US and the shekel sign prefixed manually: the he-IL
-// currency formatter emits RTL control marks that corrupt an otherwise LTR layout.
+// currency formatter emits RTL control marks that corrupt the number itself.
 const GROUPED = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 0,
   maximumFractionDigits: 0,
@@ -9,6 +9,19 @@ const GROUPED_PRECISE = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+
+/**
+ * Amounts are LTR runs ("−₪1,250") sitting inside RTL Hebrew text. Without an
+ * isolate the sign and the shekel sign get reordered by the bidi algorithm, so
+ * every amount is wrapped in LRI…PDI. These are zero-width formatting characters.
+ */
+const LRI = '\u2066';
+const PDI = '\u2069';
+
+/** Strips the bidi isolates, for comparisons and any non-display use. */
+export function stripBidi(text: string): string {
+  return text.replace(/[\u2066\u2069]/g, '');
+}
 
 /** Money is stored in agorot (integer minor units) to keep rollover math exact. */
 export function toAgorot(major: number): number {
@@ -23,8 +36,8 @@ export function formatAgorot(agorot: number, opts?: { precise?: boolean; signed?
   const value = toMajor(agorot);
   const fmt = opts?.precise ? GROUPED_PRECISE : GROUPED;
   const text = `₪${fmt.format(Math.abs(value))}`;
-  if (opts?.signed && agorot !== 0) return `${agorot > 0 ? '+' : '−'}${text}`;
-  return agorot < 0 ? `−${text}` : text;
+  if (opts?.signed && agorot !== 0) return `${LRI}${agorot > 0 ? '+' : '−'}${text}${PDI}`;
+  return agorot < 0 ? `${LRI}−${text}${PDI}` : `${LRI}${text}${PDI}`;
 }
 
 export function parseMoneyInput(raw: string): number | null {
@@ -39,7 +52,7 @@ export function periodKey(year: number, month: number): string {
 }
 
 export function periodLabel(year: number, month: number): string {
-  return new Date(year, month - 1, 1).toLocaleDateString('en-US', {
+  return new Date(year, month - 1, 1).toLocaleDateString('he-IL', {
     month: 'long',
     year: 'numeric',
   });

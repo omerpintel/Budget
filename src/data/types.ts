@@ -84,15 +84,15 @@ export interface BudgetPeriod {
 
 /** Israeli issuers whose statement formats ship with the app. */
 export const ISSUERS = [
-  { value: 'isracard', label: 'Isracard' },
-  { value: 'max', label: 'Max' },
-  { value: 'cal', label: 'Cal (Visa Cal)' },
-  { value: 'amex-il', label: 'American Express (IL)' },
-  { value: 'hapoalim', label: 'Bank Hapoalim' },
-  { value: 'leumi', label: 'Bank Leumi' },
-  { value: 'discount', label: 'Discount Bank' },
-  { value: 'mizrahi', label: 'Mizrahi Tefahot' },
-  { value: 'other', label: 'Other' },
+  { value: 'isracard', label: 'ישראכרט' },
+  { value: 'max', label: 'מאקס' },
+  { value: 'cal', label: 'כאל (ויזה כאל)' },
+  { value: 'amex-il', label: 'אמריקן אקספרס' },
+  { value: 'hapoalim', label: 'בנק הפועלים' },
+  { value: 'leumi', label: 'בנק לאומי' },
+  { value: 'discount', label: 'בנק דיסקונט' },
+  { value: 'mizrahi', label: 'מזרחי טפחות' },
+  { value: 'other', label: 'אחר' },
 ] as const;
 
 export const PERSON_COLORS = ['omer', 'roni'] as const;

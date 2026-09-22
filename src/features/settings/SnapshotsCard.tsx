@@ -32,19 +32,19 @@ export function SnapshotsCard() {
   return (
     <Card>
       <CardHeader
-        title="Automatic snapshots"
-        description="A copy of the database is kept on launch, once a day, and the last seven are retained. These live on this machine only."
+        title="תצלומי מצב אוטומטיים"
+        description="עותק של מסד הנתונים נשמר בעלייה, פעם ביום, ושבעה האחרונים נשמרים. הם נמצאים על המחשב הזה בלבד."
         action={
           <Button size="sm" variant="secondary" disabled={take.isPending} onClick={() => take.mutate()}>
             <HardDriveDownload className="size-3.5" />
-            {take.isPending ? 'Saving…' : 'Snapshot now'}
+            {take.isPending ? 'שומר…' : 'תצלום עכשיו'}
           </Button>
         }
       />
       <CardBody>
         {snapshots.length === 0 ? (
           <p className="text-fg-subtle text-xs">
-            No snapshots yet. One is taken automatically the first time you launch with data.
+            עדיין אין תצלומי מצב. הראשון יילקח אוטומטית בפעם הראשונה שתפעיל את האפליקציה עם נתונים.
           </p>
         ) : (
           <table className="w-full text-xs">
@@ -52,7 +52,7 @@ export function SnapshotsCard() {
               {snapshots.map((snapshot) => (
                 <tr key={snapshot.name} className="border-line/60 border-b last:border-0">
                   <td className="py-2 font-medium">
-                    {new Date(snapshot.createdAt).toLocaleString('en-GB', {
+                    {new Date(snapshot.createdAt).toLocaleString('he-IL', {
                       day: 'numeric',
                       month: 'short',
                       hour: '2-digit',
@@ -60,14 +60,14 @@ export function SnapshotsCard() {
                     })}
                   </td>
                   <td className="text-fg-muted tnum py-2">{formatSize(snapshot.size)}</td>
-                  <td className="py-2 text-right">
+                  <td className="py-2 text-end">
                     <div className="flex justify-end gap-1">
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => void downloadSnapshot(snapshot.name)}
                       >
-                        <Download className="size-3.5" /> Save
+                        <Download className="size-3.5" /> שמירה
                       </Button>
                       {confirming === snapshot.name ? (
                         <>
@@ -79,10 +79,10 @@ export function SnapshotsCard() {
                               window.location.reload();
                             }}
                           >
-                            Replace everything
+                            החלפת הכל
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
-                            Cancel
+                            ביטול
                           </Button>
                         </>
                       ) : (
@@ -91,12 +91,12 @@ export function SnapshotsCard() {
                           variant="ghost"
                           onClick={() => setConfirming(snapshot.name)}
                         >
-                          <RotateCcw className="size-3.5" /> Restore
+                          <RotateCcw className="size-3.5" /> שחזור
                         </Button>
                       )}
                       <button
                         type="button"
-                        aria-label={`Delete snapshot ${snapshot.name}`}
+                        aria-label={`מחיקת תצלום המצב ${snapshot.name}`}
                         className="text-fg-subtle hover:text-negative px-1"
                         onClick={() => remove.mutate(snapshot.name)}
                       >

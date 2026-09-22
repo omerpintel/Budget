@@ -6,10 +6,10 @@ export interface RunStatus {
 }
 
 export const RUN_STEPS = [
-  { id: 'bank', label: 'Bank' },
-  { id: 'import', label: 'Import' },
-  { id: 'triage', label: 'Triage' },
-  { id: 'reconcile', label: 'Reconcile' },
+  { id: 'bank', label: 'בנק' },
+  { id: 'import', label: 'ייבוא' },
+  { id: 'triage', label: 'מיון' },
+  { id: 'reconcile', label: 'התאמה' },
 ] as const;
 
 /**

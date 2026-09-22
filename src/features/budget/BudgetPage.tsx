@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { ArrowRight, Copy, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import { PageHeader, EmptyState } from '@/components/ui/Feedback';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Field, Input, MoneyInput, Select } from '@/components/ui/Field';
 import { WalletCard } from '@/components/WalletCard';
 import { ShortfallDialog } from './ShortfallDialog';
-import { listPeriods } from '@/data/periods';
+import { findPeriod } from '@/data/periods';
 import { listWallets } from '@/data/wallets';
 import { listPeople } from '@/data/people';
 import { listCategories } from '@/data/categories';
@@ -33,18 +34,29 @@ import {
 } from '@/data/periodEngine';
 import { leftToAssign } from '@/services/budget/engine';
 import { formatAgorot, parseMoneyInput, periodLabel, toMajor } from '@/lib/money';
+import { usePeriod } from '@/state/period';
 import { cn } from '@/lib/utils';
+
+const KIND_LABELS: Record<'fixed' | 'flexible' | 'savings', string> = {
+  fixed: 'הוצאות קבועות',
+  flexible: 'הוצאות משתנות',
+  savings: 'חיסכון',
+};
 
 export function BudgetPage() {
   const qc = useQueryClient();
-  const [periodId, setPeriodId] = useState('');
+  const { ref } = usePeriod();
   const [carried, setCarried] = useState(false);
 
-  const { data: periods } = useQuery({ queryKey: ['periods'], queryFn: listPeriods });
+  const { data: period, isFetched } = useQuery({
+    queryKey: ['period', ref.year, ref.month],
+    queryFn: () => findPeriod(ref),
+  });
+  const periodId = period?.id ?? '';
 
   useEffect(() => {
-    if (!periodId && periods && periods.length > 0) setPeriodId(periods[0].id);
-  }, [periods, periodId]);
+    setCarried(false);
+  }, [periodId]);
 
   const { data } = useQuery({
     enabled: Boolean(periodId),
@@ -68,17 +80,19 @@ export function BudgetPage() {
 
   const invalidate = () => qc.invalidateQueries();
 
-  const period = periods?.find((p) => p.id === periodId);
-
-  if (!periods) return null;
-  if (periods.length === 0) {
+  if (isFetched && !period) {
     return (
       <>
-        <PageHeader title="Budget" />
+        <PageHeader title="תקציב" />
         <Card>
           <EmptyState
-            title="No periods yet"
-            description="Import a statement or add a manual transaction, and the period it belongs to appears here."
+            title={`לא תוכנן כלום ל${periodLabel(ref.year, ref.month)}`}
+            description="התחל את סגירת החודש, והתקציב שלו יופיע כאן."
+            action={
+              <Link to="/run">
+                <Button>מעבר לסגירת החודש</Button>
+              </Link>
+            }
           />
         </Card>
       </>
@@ -87,7 +101,7 @@ export function BudgetPage() {
   if (!data || !period) return null;
 
   const { result, lines, allowances, incomes, actuals, wallets, people, categories, transfers } = data;
-  const personName = (id: string | null) => people.find((p) => p.id === id)?.name ?? 'Unknown';
+  const personName = (id: string | null) => people.find((p) => p.id === id)?.name ?? 'לא ידוע';
   const jointWallet = wallets.find((w) => w.kind === 'joint_buffer');
   const balances = new Map(
     wallets.map((w) => {
@@ -110,24 +124,10 @@ export function BudgetPage() {
   return (
     <>
       <PageHeader
-        title="Budget"
-        description="Give every shekel of this month's income a job, then see where it actually went."
+        title="תקציב"
+        description="תן לכל שקל מההכנסה של החודש תפקיד, ואחר כך תראה לאן הכסף באמת הלך."
         action={
           <div className="flex shrink-0 items-center gap-2">
-            <Select
-              className="h-8 w-40 text-xs"
-              value={periodId}
-              onChange={(e) => {
-                setPeriodId(e.target.value);
-                setCarried(false);
-              }}
-            >
-              {periods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {periodLabel(p.year, p.month)}
-                </option>
-              ))}
-            </Select>
             {committed ? (
               <Button
                 size="sm"
@@ -137,7 +137,7 @@ export function BudgetPage() {
                   invalidate();
                 }}
               >
-                <LockOpen className="size-3.5" /> Reopen
+                <LockOpen className="size-3.5" /> פתיחה מחדש
               </Button>
             ) : (
               <Button
@@ -147,7 +147,7 @@ export function BudgetPage() {
                   invalidate();
                 }}
               >
-                <Lock className="size-3.5" /> Commit
+                <Lock className="size-3.5" /> נעילה
               </Button>
             )}
           </div>
@@ -156,16 +156,16 @@ export function BudgetPage() {
 
       <div className="mb-4 grid grid-cols-4 gap-3">
         <WalletCard
-          name="Joint"
+          name="משותף"
           kind="joint_buffer"
           balance={result.joint.closing}
-          caption={`${formatAgorot(result.joint.delta, { signed: true })} this month`}
+          caption={`${formatAgorot(result.joint.delta, { signed: true })} החודש`}
         />
         <WalletCard
-          name="Savings"
+          name="חיסכון"
           kind="savings"
           balance={result.savings.closing}
-          caption={`${formatAgorot(result.savings.delta, { signed: true })} this month`}
+          caption={`${formatAgorot(result.savings.delta, { signed: true })} החודש`}
         />
         {people.map((person, i) => (
           <WalletCard
@@ -176,7 +176,7 @@ export function BudgetPage() {
             balance={result.personal[person.id]?.closing ?? 0}
             caption={`${formatAgorot(result.personal[person.id]?.delta ?? 0, {
               signed: true,
-            })} this month`}
+            })} החודש`}
           />
         ))}
       </div>
@@ -196,7 +196,7 @@ export function BudgetPage() {
                 fromWalletId,
                 toWalletId: jointWallet.id,
                 amount,
-                reason: 'Cover shortfall',
+                reason: 'כיסוי גירעון',
               });
               invalidate();
             }}
@@ -253,7 +253,7 @@ function IncomeCard({
   disabled: boolean;
   onChanged: () => void;
 }) {
-  const [label, setLabel] = useState('Salary');
+  const [label, setLabel] = useState('משכורת');
   const [personId, setPersonId] = useState(people[0]?.id ?? '');
   const [amountRaw, setAmountRaw] = useState('');
   const total = incomes.reduce((s, i) => s + i.amount, 0);
@@ -261,8 +261,8 @@ function IncomeCard({
   return (
     <Card>
       <CardHeader
-        title="Income this month"
-        description="Salaries vary, so enter what actually landed in the account."
+        title="הכנסות החודש"
+        description="המשכורות משתנות, אז הזן מה שבאמת נכנס לחשבון."
         action={<span className="tnum text-sm font-semibold">{formatAgorot(total)}</span>}
       />
       <CardBody className="space-y-3">
@@ -273,7 +273,7 @@ function IncomeCard({
                 <tr key={income.id} className="border-line/60 border-b last:border-0">
                   <td className="py-2 font-medium">{income.label}</td>
                   <td className="text-fg-muted py-2">
-                    {income.person_id ? people.find((p) => p.id === income.person_id)?.name : 'Household'}
+                    {income.person_id ? people.find((p) => p.id === income.person_id)?.name : 'משק הבית'}
                   </td>
                   <td className="w-32 py-2">
                     <MoneyInput
@@ -291,10 +291,10 @@ function IncomeCard({
                       }}
                     />
                   </td>
-                  <td className="w-8 text-right">
+                  <td className="w-8 text-end">
                     <button
                       type="button"
-                      aria-label={`Remove ${income.label}`}
+                      aria-label={`הסרת ${income.label}`}
                       disabled={disabled}
                       className="text-fg-subtle hover:text-negative disabled:opacity-40"
                       onClick={async () => {
@@ -312,12 +312,12 @@ function IncomeCard({
         )}
 
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-3">
-          <Field label="Label">
+          <Field label="תיאור">
             <Input value={label} disabled={disabled} onChange={(e) => setLabel(e.target.value)} />
           </Field>
-          <Field label="Whose">
+          <Field label="של מי">
             <Select value={personId} disabled={disabled} onChange={(e) => setPersonId(e.target.value)}>
-              <option value="">Household</option>
+              <option value="">משק הבית</option>
               {people.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -325,7 +325,7 @@ function IncomeCard({
               ))}
             </Select>
           </Field>
-          <Field label="Amount">
+          <Field label="סכום">
             <MoneyInput
               value={amountRaw}
               disabled={disabled}
@@ -345,7 +345,7 @@ function IncomeCard({
               onChanged();
             }}
           >
-            <Plus className="size-4" /> Add
+            <Plus className="size-4" /> הוספה
           </Button>
         </div>
       </CardBody>
@@ -393,8 +393,8 @@ function AllocationCard({
   return (
     <Card>
       <CardHeader
-        title="Allocation"
-        description="Income minus fixed costs, allowances and savings leaves your joint flexible budget."
+        title="שיוך"
+        description="הכנסה פחות הוצאות קבועות, דמי כיס וחיסכון — מה שנשאר הוא התקציב המשותף המשתנה."
         action={
           <div className="flex items-center gap-2">
             <Button
@@ -406,7 +406,7 @@ function AllocationCard({
                 onChanged();
               }}
             >
-              <Copy className="size-3.5" /> Copy last month
+              <Copy className="size-3.5" /> העתק מהחודש שעבר
             </Button>
           </div>
         }
@@ -424,29 +424,29 @@ function AllocationCard({
         >
           <span className="text-xs font-medium">
             {unassigned === 0
-              ? 'Every shekel has a job'
+              ? 'לכל שקל יש תפקיד'
               : unassigned > 0
-                ? 'Left to assign'
-                : 'Over-assigned'}
+                ? 'נותר לשייך'
+                : 'שויך יותר מדי'}
           </span>
           <span className="tnum text-sm font-semibold">{formatAgorot(unassigned)}</span>
         </div>
 
         {income === 0 && (
-          <p className="text-fg-subtle text-xs">Add this month&rsquo;s income above to start allocating.</p>
+          <p className="text-fg-subtle text-xs">הזן למעלה את ההכנסות של החודש כדי להתחיל לשייך.</p>
         )}
 
         {(['fixed', 'flexible', 'savings'] as const).map((kind) =>
           grouped[kind].length === 0 ? null : (
             <div key={kind}>
-              <div className="text-fg-muted mb-1.5 text-xs font-medium capitalize">{kind}</div>
+              <div className="text-fg-muted mb-1.5 text-xs font-medium">{KIND_LABELS[kind]}</div>
               <table className="w-full text-xs">
                 <thead className="text-fg-subtle">
-                  <tr className="text-left">
-                    <th className="pb-1 font-medium">Category</th>
-                    <th className="w-28 pb-1 font-medium">Planned</th>
-                    <th className="w-24 pb-1 text-right font-medium">Actual</th>
-                    <th className="w-24 pb-1 text-right font-medium">Left</th>
+                  <tr className="text-start">
+                    <th className="pb-1 font-medium">קטגוריה</th>
+                    <th className="w-28 pb-1 font-medium">מתוכנן</th>
+                    <th className="w-24 pb-1 text-end font-medium">בפועל</th>
+                    <th className="w-24 pb-1 text-end font-medium">נותר</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -471,10 +471,10 @@ function AllocationCard({
                             }}
                           />
                         </td>
-                        <td className="tnum py-1.5 text-right">{formatAgorot(actual)}</td>
+                        <td className="tnum py-1.5 text-end">{formatAgorot(actual)}</td>
                         <td
                           className={cn(
-                            'tnum py-1.5 text-right',
+                            'tnum py-1.5 text-end',
                             left < 0 ? 'text-negative' : 'text-fg-muted',
                           )}
                         >
@@ -490,7 +490,7 @@ function AllocationCard({
         )}
 
         <div>
-          <div className="text-fg-muted mb-1.5 text-xs font-medium">Personal allowances</div>
+          <div className="text-fg-muted mb-1.5 text-xs font-medium">דמי כיס אישיים</div>
           <table className="w-full text-xs">
             <tbody>
               {people.map((person) => {
@@ -514,7 +514,7 @@ function AllocationCard({
                       />
                     </td>
                     <td className="text-fg-subtle py-1.5 text-xs">
-                      Funded whether or not it is spent; anything left rolls over to {person.name}.
+                      מועבר גם אם לא מנוצל; מה שנשאר מתגלגל ל{person.name}.
                     </td>
                   </tr>
                 );
@@ -525,9 +525,9 @@ function AllocationCard({
 
         {addable.length > 0 && (
           <div className="flex items-end gap-2">
-            <Field label="Add a category to the plan" className="max-w-64">
+            <Field label="הוספת קטגוריה לתוכנית" className="max-w-64">
               <Select value={adding} disabled={disabled} onChange={(e) => setAdding(e.target.value)}>
-                <option value="">— choose —</option>
+                <option value="">— בחר —</option>
                 {addable.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -545,7 +545,7 @@ function AllocationCard({
                 onChanged();
               }}
             >
-              <Plus className="size-4" /> Add
+              <Plus className="size-4" /> הוספה
             </Button>
           </div>
         )}
@@ -575,14 +575,14 @@ function TransfersCard({
   const label = (id: string) => {
     const w = wallets.find((x) => x.id === id);
     if (!w) return '—';
-    return w.kind === 'personal' ? `${personName(w.person_id)}'s wallet` : w.name;
+    return w.kind === 'personal' ? `הארנק של ${personName(w.person_id)}` : w.name;
   };
 
   return (
     <Card>
       <CardHeader
-        title="Transfers between pools"
-        description="Move money into savings, or bail out the joint buffer from a personal wallet."
+        title="העברות בין הארנקים"
+        description="העבר כסף לחיסכון, או חלץ את הכרית המשותפת מארנק אישי."
       />
       <CardBody className="space-y-3">
         {transfers.length > 0 && (
@@ -592,15 +592,15 @@ function TransfersCard({
                 <tr key={t.id} className="border-line/60 border-b last:border-0">
                   <td className="py-2">{label(t.from_wallet_id)}</td>
                   <td className="w-6 py-2">
-                    <ArrowRight className="text-fg-subtle size-3.5" />
+                    <ArrowRight className="dir-icon text-fg-subtle size-3.5" />
                   </td>
                   <td className="py-2">{label(t.to_wallet_id)}</td>
                   <td className="text-fg-muted py-2">{t.reason}</td>
-                  <td className="tnum w-24 py-2 text-right">{formatAgorot(t.amount)}</td>
-                  <td className="w-8 text-right">
+                  <td className="tnum w-24 py-2 text-end">{formatAgorot(t.amount)}</td>
+                  <td className="w-8 text-end">
                     <button
                       type="button"
-                      aria-label="Remove transfer"
+                      aria-label="הסרת העברה"
                       disabled={disabled}
                       className="text-fg-subtle hover:text-negative disabled:opacity-40"
                       onClick={async () => {
@@ -618,7 +618,7 @@ function TransfersCard({
         )}
 
         <div className="grid grid-cols-[1fr_auto_1fr_1fr_auto] items-end gap-3">
-          <Field label="From">
+          <Field label="מקור">
             <Select value={from} disabled={disabled} onChange={(e) => setFrom(e.target.value)}>
               {wallets.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -627,8 +627,8 @@ function TransfersCard({
               ))}
             </Select>
           </Field>
-          <ArrowRight className="text-fg-subtle mb-3 size-4" />
-          <Field label="To">
+          <ArrowRight className="dir-icon text-fg-subtle mb-3 size-4" />
+          <Field label="יעד">
             <Select value={to} disabled={disabled} onChange={(e) => setTo(e.target.value)}>
               {wallets.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -637,7 +637,7 @@ function TransfersCard({
               ))}
             </Select>
           </Field>
-          <Field label="Amount">
+          <Field label="סכום">
             <MoneyInput
               value={amountRaw}
               disabled={disabled}
@@ -658,7 +658,7 @@ function TransfersCard({
               onChanged();
             }}
           >
-            Move
+            העבר
           </Button>
         </div>
       </CardBody>

@@ -5,7 +5,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: 'Inter Variable', 'Heebo Variable', system-ui, sans-serif;
+  --font-sans: 'Heebo Variable', 'Inter Variable', system-ui, sans-serif;
   --font-hebrew: 'Heebo Variable', 'Inter Variable', system-ui, sans-serif;
 
   --radius-card: 0.75rem;
@@ -101,6 +101,14 @@
   .tnum {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
+    /* Amounts carry a ₪ and a leading sign, which bidi would otherwise reorder. */
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  /* Arrows that express direction of travel; the layout is RTL so they mirror. */
+  .dir-icon {
+    transform: scaleX(-1);
   }
 
   ::-webkit-scrollbar {

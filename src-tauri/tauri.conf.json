@@ -27,7 +27,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "publisher": "Omer Pintel",
+    "copyright": "Omer Pintel",
+    "shortDescription": "Household budgeting — Mine · Yours · Ours",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,6 +38,17 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false
+      },
+      "webviewInstallMode": {
+        "type": "embedBootstrapper",
+        "silent": true
+      }
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }

@@ -36,8 +36,8 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <header className="mb-6 flex items-end justify-between gap-6">
-      <div>
+    <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="min-w-0 flex-1">
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {description ? <p className="text-fg-muted mt-1 text-sm">{description}</p> : null}
       </div>

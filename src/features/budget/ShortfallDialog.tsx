@@ -31,24 +31,24 @@ export function ShortfallDialog({
   const amount = parseMoneyInput(amountRaw) ?? 0;
   const available = balances.get(fromWalletId) ?? 0;
   const label = (w: Wallet) =>
-    w.kind === 'personal' ? `${personName(w.person_id)}'s wallet` : w.name;
+    w.kind === 'personal' ? `הארנק של ${personName(w.person_id)}` : w.name;
 
   return (
     <Card className="border-negative/40">
       <CardHeader
-        title={`The joint buffer is ${formatAgorot(-shortfall)}`}
-        description="Move money in to cover it, or carry the deficit into next month. Carrying it is a legitimate choice — the buffer simply opens negative."
+        title={`הכרית המשותפת עומדת על ${formatAgorot(-shortfall)}`}
+        description="אפשר להעביר כסף כדי לכסות את הגירעון, או לגלגל אותו לחודש הבא. לגלגל זו בחירה לגיטימית — הכרית פשוט תיפתח במינוס."
       />
       <CardBody className="space-y-3">
         <div className="border-negative/30 bg-negative/5 flex items-start gap-2.5 rounded-lg border p-3">
           <AlertTriangle className="text-negative mt-px size-4 shrink-0" />
           <p className="text-xs leading-relaxed">
-            You need {formatAgorot(shortfall)} to bring the joint buffer back to zero.
+            צריך {formatAgorot(shortfall)} כדי להחזיר את הכרית המשותפת לאפס.
           </p>
         </div>
 
         <div className="grid grid-cols-[1fr_auto_1fr_auto] items-end gap-3">
-          <Field label="Take from" hint={`Available ${formatAgorot(available)}`}>
+          <Field label="מקור" hint={`זמין ${formatAgorot(available)}`}>
             <Select value={fromWalletId} onChange={(e) => setFromWalletId(e.target.value)}>
               {donors.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -57,8 +57,8 @@ export function ShortfallDialog({
               ))}
             </Select>
           </Field>
-          <ArrowRight className="text-fg-subtle mb-3 size-4" />
-          <Field label="Amount">
+          <ArrowRight className="dir-icon text-fg-subtle mb-3 size-4" />
+          <Field label="סכום">
             <MoneyInput value={amountRaw} onChange={(e) => setAmountRaw(e.target.value)} />
           </Field>
           <Button
@@ -72,13 +72,13 @@ export function ShortfallDialog({
               }
             }}
           >
-            Cover
+            כיסוי
           </Button>
         </div>
 
         <div className="flex justify-end">
           <Button variant="ghost" size="sm" onClick={onCarry}>
-            Carry the deficit into next month
+            גלגל את הגירעון לחודש הבא
           </Button>
         </div>
       </CardBody>

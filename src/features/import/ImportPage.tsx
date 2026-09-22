@@ -132,7 +132,7 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
         name: 'done',
         inserted: result.inserted,
         duplicates: result.duplicatesSkipped,
-        period: backfill ? 'historical backfill' : periodLabel(periodRef.year, periodRef.month),
+        period: backfill ? 'טעינה היסטורית' : periodLabel(periodRef.year, periodRef.month),
       });
     } catch (err) {
       setStage({ name: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -150,10 +150,10 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
   if (accounts.length === 0) {
     return (
       <>
-        {!embedded && <PageHeader title="Import" />}
+        {!embedded && <PageHeader title="ייבוא" />}
         <Card>
           <CardBody className="text-fg-muted py-10 text-center text-sm">
-            Add a card in Settings before importing.
+            הוסף כרטיס בהגדרות לפני הייבוא.
           </CardBody>
         </Card>
       </>
@@ -164,12 +164,12 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
     <>
       {!embedded && (
         <PageHeader
-          title="Import statement"
-          description="Charges land in the period their bill hits the bank, not the month you swiped."
+          title="ייבוא דף חיוב"
+          description="חיובים נכנסים לחודש שבו דף החיוב יורד מהבנק, לא לחודש שבו העברת את הכרטיס."
           action={
             stage.name !== 'idle' ? (
               <Button variant="ghost" size="sm" onClick={reset}>
-                <ArrowLeft className="size-3.5" /> Start over
+                <ArrowLeft className="dir-icon size-3.5" /> התחלה מחדש
               </Button>
             ) : undefined
           }
@@ -179,16 +179,16 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
       {embedded && stage.name !== 'idle' && (
         <div className="mb-3 flex justify-end">
           <Button variant="ghost" size="sm" onClick={reset}>
-            <ArrowLeft className="size-3.5" /> Start over
+            <ArrowLeft className="dir-icon size-3.5" /> התחלה מחדש
           </Button>
         </div>
       )}
 
       <div className="space-y-4">
         <Card>
-          <CardHeader title="Which card is this?" />
+          <CardHeader title="איזה כרטיס זה?" />
           <CardBody className="grid grid-cols-3 gap-4">
-            <Field label="Card">
+            <Field label="כרטיס">
               <Select
                 value={account?.id ?? ''}
                 onChange={(e) => setAccountId(e.target.value)}
@@ -202,7 +202,7 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
                 ))}
               </Select>
             </Field>
-            <Field label="Issuer format" hint={`Owner: ${ownerName}`}>
+            <Field label="פורמט המנפיק" hint={`בעלים: ${ownerName}`}>
               <Select value={account?.issuer ?? 'other'} disabled>
                 {ISSUERS.map((i) => (
                   <option key={i.value} value={i.value}>
@@ -212,8 +212,8 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
               </Select>
             </Field>
             <Field
-              label="Bill debits in"
-              hint={backfill ? 'Disabled during backfill' : `Debit day ${account?.debit_day ?? '—'}`}
+              label="החיוב יורד בחודש"
+              hint={backfill ? 'מושבת בטעינה היסטורית' : `יום חיוב ${account?.debit_day ?? '—'}`}
             >
               <Select
                 value={`${periodRef.year}-${periodRef.month}`}
@@ -244,15 +244,14 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
                 onChange={(e) => setBackfill(e.target.checked)}
                 className="accent-brand"
               />
-              Historical backfill — load old statements to train categorisation without touching any budget
-              period
+              טעינה היסטורית — טעינת דפי חיוב ישנים כדי ללמד את הקטגוריזציה, בלי לגעת באף חודש תקציבי
             </label>
           </>
         )}
 
         {stage.name === 'parsing' && (
           <Card>
-            <CardBody className="text-fg-muted py-10 text-center text-sm">Reading statement…</CardBody>
+            <CardBody className="text-fg-muted py-10 text-center text-sm">קורא את דף החיוב…</CardBody>
           </Card>
         )}
 
@@ -268,11 +267,11 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
         {stage.name === 'mapping' && (
           <Card>
             <CardHeader
-              title="Tell me how to read this file"
-              description="The columns were not recognised automatically. Match them once and the choice is saved for this issuer."
+              title="איך לקרוא את הקובץ הזה?"
+              description="העמודות לא זוהו אוטומטית. התאם אותן פעם אחת והבחירה תישמר למנפיק הזה."
               action={
                 <Button size="sm" onClick={applyMapping} disabled={!isMappingUsable(mapDraft.map)}>
-                  Apply mapping
+                  החלת המיפוי
                 </Button>
               }
             />
@@ -313,16 +312,16 @@ export function ImportPage({ embedded = false }: { embedded?: boolean } = {}) {
             <CardBody className="space-y-2 py-8 text-center">
               <CheckCircle2 className="text-positive mx-auto size-7" strokeWidth={1.5} />
               <p className="text-sm font-medium">
-                Imported {stage.inserted} transaction{stage.inserted === 1 ? '' : 's'} into {stage.period}
+                יובאו {stage.inserted} תנועות אל {stage.period}
               </p>
               {stage.duplicates > 0 && (
                 <p className="text-fg-muted text-xs">
-                  {stage.duplicates} duplicate{stage.duplicates === 1 ? '' : 's'} skipped
+                  {stage.duplicates} כפילויות דולגו
                 </p>
               )}
               <div className="pt-2">
                 <Button size="sm" variant="secondary" onClick={reset}>
-                  Import another
+                  ייבוא קובץ נוסף
                 </Button>
               </div>
             </CardBody>
@@ -360,34 +359,33 @@ function ReviewStage({
   return (
     <Card>
       <CardHeader
-        title={`${fresh.length} new transaction${fresh.length === 1 ? '' : 's'}`}
-        description={`${fileName} · ${result.fileKind.toUpperCase()} · ${result.encoding} · debits ${debitDate} · ${
-          backfill ? 'historical backfill' : periodText
+        title={`${fresh.length} תנועות חדשות`}
+        description={`${fileName} · ${result.fileKind.toUpperCase()} · ${result.encoding} · יורד בתאריך ${debitDate} · ${
+          backfill ? 'טעינה היסטורית' : periodText
         }`}
         action={
           <Button size="sm" onClick={onCommit} disabled={fresh.length === 0}>
-            Import {fresh.length}
+            ייבוא {fresh.length}
           </Button>
         }
       />
       <CardBody className="space-y-3">
         <div className="grid grid-cols-4 gap-3">
-          <Stat label="Outflow" value={formatAgorot(-outflow)} />
-          <Stat label="Inflow" value={formatAgorot(inflow)} />
-          <Stat label="Duplicates skipped" value={String(duplicates)} />
-          <Stat label="Rows ignored" value={String(result.skipped.length)} />
+          <Stat label="יצא" value={formatAgorot(-outflow)} />
+          <Stat label="נכנס" value={formatAgorot(inflow)} />
+          <Stat label="כפילויות שדולגו" value={String(duplicates)} />
+          <Stat label="שורות שהתעלמנו מהן" value={String(result.skipped.length)} />
         </div>
 
         {alreadyImported && (
           <Notice icon={<AlertTriangle className="text-warning size-4" />}>
-            This exact file was imported before. Any rows already stored are marked as duplicates and will
-            not be added again.
+            הקובץ הזה כבר יובא בעבר. שורות שכבר שמורות מסומנות ככפילויות ולא ייווספו שוב.
           </Notice>
         )}
 
         {result.skipped.length > 0 && (
           <Notice icon={<Info className="text-fg-subtle size-4" />}>
-            Ignored {result.skipped.length} row{result.skipped.length === 1 ? '' : 's'}:{' '}
+            התעלמנו מ־{result.skipped.length} שורות:{' '}
             {[...new Set(result.skipped.map((s) => s.reason))].join(', ')}.
           </Notice>
         )}
@@ -395,11 +393,11 @@ function ReviewStage({
         <div className="border-line max-h-96 overflow-y-auto rounded-lg border">
           <table className="w-full text-xs">
             <thead className="bg-surface-2 text-fg-subtle sticky top-0">
-              <tr className="text-left">
-                <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Merchant</th>
-                <th className="px-3 py-2 text-right font-medium">Amount</th>
-                <th className="px-3 py-2 font-medium">Note</th>
+              <tr className="text-start">
+                <th className="px-3 py-2 font-medium">תאריך</th>
+                <th className="px-3 py-2 font-medium">בית עסק</th>
+                <th className="px-3 py-2 text-end font-medium">סכום</th>
+                <th className="px-3 py-2 font-medium">הערה</th>
               </tr>
             </thead>
             <tbody>
@@ -412,14 +410,14 @@ function ReviewStage({
                   <td className="max-w-72 truncate px-3 py-2">
                     <MerchantText value={row.description} />
                   </td>
-                  <td className="tnum px-3 py-2 text-right whitespace-nowrap">
+                  <td className="tnum px-3 py-2 text-end whitespace-nowrap">
                     {formatAgorot(row.direction === 'out' ? -row.amount : row.amount, { precise: true })}
                   </td>
                   <td className="text-fg-subtle px-3 py-2 whitespace-nowrap">
                     {row.installment
-                      ? `Payment ${row.installment.current}/${row.installment.total}`
+                      ? `תשלום ${row.installment.current}/${row.installment.total}`
                       : row.originalCurrency
-                        ? `${row.originalCurrency} original`
+                        ? `מקור ב־${row.originalCurrency}`
                         : ''}
                   </td>
                 </tr>

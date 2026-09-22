@@ -6,18 +6,13 @@ import { getSetting, SETTING_KEYS } from '@/data/settings';
 import { autoSnapshot } from '@/data/snapshots';
 import { AppShell } from '@/components/layout/AppShell';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PeriodProvider } from '@/state/period';
 import { DashboardPage } from '@/pages/DashboardPage';
 
 // Everything except the dashboard loads on demand; the SQLite worker is already
 // a large download and there is no reason to ship every screen up front.
 const MonthlyRunPage = lazy(() =>
   import('@/features/run/MonthlyRunPage').then((m) => ({ default: m.MonthlyRunPage })),
-);
-const ImportPage = lazy(() =>
-  import('@/features/import/ImportPage').then((m) => ({ default: m.ImportPage })),
-);
-const TriagePage = lazy(() =>
-  import('@/features/triage/TriagePage').then((m) => ({ default: m.TriagePage })),
 );
 const TransactionsPage = lazy(() =>
   import('@/pages/TransactionsPage').then((m) => ({ default: m.TransactionsPage })),
@@ -40,7 +35,7 @@ const queryClient = new QueryClient({
 });
 
 function Loading() {
-  return <div className="text-fg-subtle flex h-full items-center justify-center text-sm">Loading…</div>;
+  return <div className="text-fg-subtle flex h-full items-center justify-center text-sm">טוען…</div>;
 }
 
 function page(element: React.ReactNode) {
@@ -59,12 +54,14 @@ const router = createHashRouter([
     children: [
       { index: true, element: page(<DashboardPage />) },
       { path: 'run', element: page(<MonthlyRunPage />) },
-      { path: 'import', element: page(<ImportPage />) },
-      { path: 'triage', element: page(<TriagePage />) },
       { path: 'transactions', element: page(<TransactionsPage />) },
       { path: 'budget', element: page(<BudgetPage />) },
-      { path: 'insights', element: page(<InsightsPage />) },
       { path: 'settings', element: page(<SettingsPage />) },
+      // Reached from the overview card rather than the sidebar, to keep the nav short.
+      { path: 'insights', element: page(<InsightsPage />) },
+      // Folded into other screens; kept so old links and in-app redirects still land somewhere.
+      { path: 'import', element: <Navigate to="/run?step=1" replace /> },
+      { path: 'triage', element: <Navigate to="/run?step=2" replace /> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },
@@ -98,7 +95,7 @@ export function App() {
   if (boot.status === 'loading') {
     return (
       <div className="text-fg-subtle flex h-full items-center justify-center text-sm">
-        Opening your ledger…
+        פותח את הנתונים שלך…
       </div>
     );
   }
@@ -107,7 +104,7 @@ export function App() {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="max-w-md space-y-2 text-center">
-          <h1 className="text-negative text-sm font-semibold">Could not open the database</h1>
+          <h1 className="text-negative text-sm font-semibold">לא ניתן לפתוח את מסד הנתונים</h1>
           <p className="text-fg-muted text-xs break-words">{boot.message}</p>
         </div>
       </div>
@@ -116,7 +113,9 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <PeriodProvider>
+        <RouterProvider router={router} />
+      </PeriodProvider>
     </QueryClientProvider>
   );
 }

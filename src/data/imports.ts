@@ -125,3 +125,55 @@ export async function getUncategorizedCategoryId(): Promise<string | null> {
   );
   return rows[0]?.id ?? null;
 }
+
+export interface ImportBatchSummary {
+  id: string;
+  file_name: string;
+  debit_date: string;
+  imported_at: string;
+  row_count: number;
+  duplicates_skipped: number;
+  account_name: string;
+  target_period_id: string | null;
+  year: number | null;
+  month: number | null;
+  /** Rows still present; diverges from row_count once transactions are deleted individually. */
+  live_count: number;
+  reviewed_count: number;
+}
+
+export async function listImportHistory(periodId?: string): Promise<ImportBatchSummary[]> {
+  const scoped = periodId ? 'WHERE b.target_period_id = ?' : '';
+  return getDb().select<ImportBatchSummary>(
+    `SELECT b.id, b.file_name, b.debit_date, b.imported_at, b.row_count, b.duplicates_skipped,
+            b.target_period_id, a.display_name AS account_name, p.year, p.month,
+            (SELECT COUNT(*) FROM transactions t WHERE t.import_batch_id = b.id) AS live_count,
+            (SELECT COUNT(*) FROM transactions t
+              WHERE t.import_batch_id = b.id AND t.is_reviewed = 1) AS reviewed_count
+     FROM import_batches b
+     JOIN accounts a ON a.id = b.account_id
+     LEFT JOIN budget_periods p ON p.id = b.target_period_id
+     ${scoped}
+     ORDER BY b.imported_at DESC`,
+    periodId ? [periodId] : [],
+  );
+}
+
+/**
+ * Removes an upload and everything it brought in. Transactions cascade from the
+ * batch row, so the period totals must be recomputed by the caller afterwards.
+ * Returns the period the batch belonged to, if any.
+ */
+export async function deleteImportBatch(batchId: string): Promise<string | null> {
+  const rows = await getDb().select<{ target_period_id: string | null }>(
+    'SELECT target_period_id FROM import_batches WHERE id = ?',
+    [batchId],
+  );
+  if (rows.length === 0) return null;
+
+  await getDb().batch([
+    { sql: 'DELETE FROM transactions WHERE import_batch_id = ?', params: [batchId] },
+    { sql: 'DELETE FROM import_batches WHERE id = ?', params: [batchId] },
+  ]);
+  return rows[0].target_period_id;
+}

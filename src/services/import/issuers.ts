@@ -85,15 +85,15 @@ export interface IssuerAdapter {
 const TOTALS = [/^סה"?כ/, /^סהכ/, /^total/i, /^יתרה/];
 
 export const ISSUER_ADAPTERS: Record<string, IssuerAdapter> = {
-  isracard: { id: 'isracard', label: 'Isracard', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
-  max: { id: 'max', label: 'Max', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
-  cal: { id: 'cal', label: 'Cal', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
-  'amex-il': { id: 'amex-il', label: 'American Express', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
-  hapoalim: { id: 'hapoalim', label: 'Bank Hapoalim', amountSign: 'charge_negative', skipRowPatterns: TOTALS },
-  leumi: { id: 'leumi', label: 'Bank Leumi', amountSign: 'charge_negative', skipRowPatterns: TOTALS },
-  discount: { id: 'discount', label: 'Discount Bank', amountSign: 'charge_negative', skipRowPatterns: TOTALS },
-  mizrahi: { id: 'mizrahi', label: 'Mizrahi Tefahot', amountSign: 'charge_negative', skipRowPatterns: TOTALS },
-  other: { id: 'other', label: 'Other', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
+  isracard: { id: 'isracard', label: 'ישראכארט', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
+  max: { id: 'max', label: 'מאקס', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
+  cal: { id: 'cal', label: 'כאל', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
+  'amex-il': { id: 'amex-il', label: 'אמריקן אקספרס', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
+  hapoalim: { id: 'hapoalim', label: 'בנק הפועלים', amountSign: 'charge_negative', skipRowPatterns: TOTALS },
+  leumi: { id: 'leumi', label: 'בנק לאומי', amountSign: 'charge_negative', skipRowPatterns: TOTALS },
+  discount: { id: 'discount', label: 'בנק דיסקונט', amountSign: 'charge_negative', skipRowPatterns: TOTALS },
+  mizrahi: { id: 'mizrahi', label: 'מזרחי טפחות', amountSign: 'charge_negative', skipRowPatterns: TOTALS },
+  other: { id: 'other', label: 'אחר', amountSign: 'charge_positive', skipRowPatterns: TOTALS },
 };
 
 export function getAdapter(issuer: string): IssuerAdapter {

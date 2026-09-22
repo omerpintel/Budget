@@ -9,6 +9,17 @@ import { listCategories } from '@/data/categories';
 import { listMerchants } from '@/data/merchants';
 import type { WalletScope } from '@/data/types';
 
+const MATCH_LABELS: Record<string, string> = {
+  contains: 'מכיל',
+  exact: 'זהה בדיוק',
+  regex: 'ביטוי רגולרי',
+};
+
+const WALLET_LABELS: Record<string, string> = {
+  joint: 'משותף',
+  personal: 'אישי',
+};
+
 export function RulesCard() {
   const qc = useQueryClient();
   const [pattern, setPattern] = useState('');
@@ -59,33 +70,31 @@ export function RulesCard() {
   return (
     <Card>
       <CardHeader
-        title="Categorisation rules"
-        description={`Rules run before the AI. ${learned.length} merchant${
-          learned.length === 1 ? ' has' : 's have'
-        } already been learned from your corrections and need no rule.`}
+        title="כללי סיווג"
+        description={`הכללים רצים לפני הבינה המלאכותית. ${learned.length} בתי עסק כבר נלמדו מהתיקונים שלך ולא צריכים כלל.`}
       />
       <CardBody className="space-y-4">
         <div className="grid grid-cols-6 items-end gap-3">
-          <Field label="Match" >
+          <Field label="התאמה" >
             <Select
               value={matchType}
               onChange={(e) => setMatchType(e.target.value as typeof matchType)}
             >
-              <option value="contains">Contains</option>
-              <option value="exact">Exact</option>
-              <option value="regex">Regex</option>
+              <option value="contains">מכיל</option>
+              <option value="exact">זהה בדיוק</option>
+              <option value="regex">ביטוי רגולרי</option>
             </Select>
           </Field>
-          <Field label="Pattern" className="col-span-2">
+          <Field label="תבנית" className="col-span-2">
             <Input
               value={pattern}
               placeholder="שופרסל"
               onChange={(e) => setPattern(e.target.value)}
             />
           </Field>
-          <Field label="Category">
+          <Field label="קטגוריה">
             <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">— none —</option>
+              <option value="">— ללא —</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -93,22 +102,22 @@ export function RulesCard() {
               ))}
             </Select>
           </Field>
-          <Field label="Wallet">
+          <Field label="ארנק">
             <Select value={wallet} onChange={(e) => setWallet(e.target.value as WalletScope | '')}>
-              <option value="">Leave as is</option>
-              <option value="joint">Joint</option>
-              <option value="personal">Personal</option>
+              <option value="">להשאיר כמו שהוא</option>
+              <option value="joint">משותף</option>
+              <option value="personal">אישי</option>
             </Select>
           </Field>
           <Button disabled={!pattern.trim()} onClick={() => add.mutate()}>
-            <Plus className="size-4" /> Add
+            <Plus className="size-4" /> הוספה
           </Button>
         </div>
 
         {rules.length === 0 ? (
           <p className="text-fg-subtle text-xs">
-            No rules yet. You rarely need them — correcting a transaction teaches the merchant
-            automatically. Use rules for whole families, like every fuel station.
+            עדיין אין כללים. בדרך כלל לא צריך אותם — תיקון של תנועה מלמד את בית העסק
+            אוטומטית. השתמש בכללים למשפחות שלמות, כמו כל תחנות הדלק.
           </p>
         ) : (
           <table className="w-full text-xs">
@@ -119,23 +128,25 @@ export function RulesCard() {
                     <input
                       type="checkbox"
                       className="accent-brand"
-                      aria-label={`Enable ${rule.pattern}`}
+                      aria-label={`הפעלת ${rule.pattern}`}
                       checked={rule.is_enabled === 1}
                       onChange={(e) => toggle.mutate({ id: rule.id, enabled: e.target.checked })}
                     />
                   </td>
-                  <td className="text-fg-muted py-2">{rule.match_type}</td>
+                  <td className="text-fg-muted py-2">{MATCH_LABELS[rule.match_type] ?? rule.match_type}</td>
                   <td className="py-2 font-medium">
                     <code>{rule.pattern}</code>
                   </td>
                   <td className="text-fg-muted py-2">
                     {categories.find((c) => c.id === rule.category_id)?.name ?? '—'}
                   </td>
-                  <td className="text-fg-muted py-2">{rule.wallet ?? ''}</td>
-                  <td className="w-8 text-right">
+                  <td className="text-fg-muted py-2">
+                    {rule.wallet ? (WALLET_LABELS[rule.wallet] ?? rule.wallet) : ''}
+                  </td>
+                  <td className="w-8 text-end">
                     <button
                       type="button"
-                      aria-label={`Delete rule ${rule.pattern}`}
+                      aria-label={`מחיקת הכלל ${rule.pattern}`}
                       className="text-fg-subtle hover:text-negative"
                       onClick={() => remove.mutate(rule.id)}
                     >

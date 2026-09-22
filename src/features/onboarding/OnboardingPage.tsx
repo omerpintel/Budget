@@ -9,10 +9,10 @@ import { ISSUERS } from '@/data/types';
 import { completeOnboarding, type OnboardingDraft } from './completeOnboarding';
 
 const STEPS = [
-  { id: 'people', label: 'Who' },
-  { id: 'cards', label: 'Cards' },
-  { id: 'balances', label: 'Balances' },
-  { id: 'schedule', label: 'Schedule' },
+  { id: 'people', label: 'מי' },
+  { id: 'cards', label: 'כרטיסים' },
+  { id: 'balances', label: 'יתרות' },
+  { id: 'schedule', label: 'לוח זמנים' },
 ];
 
 interface DraftCard {
@@ -35,7 +35,7 @@ const newCard = (ownerIndex: 0 | 1): DraftCard => ({
 
 export function OnboardingPage() {
   const [step, setStep] = useState(0);
-  const [names, setNames] = useState<[string, string]>(['Omer', 'Roni']);
+  const [names, setNames] = useState<[string, string]>(['עומר', 'רוני']);
   const [cards, setCards] = useState<DraftCard[]>([newCard(0), newCard(1)]);
   const [totalRaw, setTotalRaw] = useState('');
   const [savingsRaw, setSavingsRaw] = useState('');
@@ -87,9 +87,9 @@ export function OnboardingPage() {
   return (
     <div className="mx-auto flex min-h-full max-w-2xl flex-col justify-center px-8 py-12">
       <div className="mb-8">
-        <h1 className="text-xl font-semibold tracking-tight">Set up your ledger</h1>
+        <h1 className="text-xl font-semibold tracking-tight">הקמת הספרים שלך</h1>
         <p className="text-fg-muted mt-1 text-sm">
-          Four short steps. Everything stays on this machine.
+          ארבעה שלבים קצרים. הכל נשאר על המחשב הזה.
         </p>
       </div>
 
@@ -101,12 +101,12 @@ export function OnboardingPage() {
         {step === 0 && (
           <>
             <CardHeader
-              title="Who is in this household?"
-              description="Each person gets their own personal wallet and a colour used across the app."
+              title="מי חי במשק הבית הזה?"
+              description="לכל אחד יש ארנק אישי משלו וצבע שמלווה אותו בכל האפליקציה."
             />
             <CardBody className="grid grid-cols-2 gap-4">
               {([0, 1] as const).map((i) => (
-                <Field key={i} label={i === 0 ? 'First person' : 'Second person'}>
+                <Field key={i} label={i === 0 ? 'אדם ראשון' : 'אדם שני'}>
                   <Input
                     value={names[i]}
                     onChange={(e) =>
@@ -116,7 +116,7 @@ export function OnboardingPage() {
                         return next;
                       })
                     }
-                    placeholder={i === 0 ? 'Omer' : 'Roni'}
+                    placeholder={i === 0 ? 'עומר' : 'רוני'}
                   />
                 </Field>
               ))}
@@ -127,11 +127,11 @@ export function OnboardingPage() {
         {step === 1 && (
           <>
             <CardHeader
-              title="Credit cards"
-              description="Each card belongs to one person — that is how the app knows whose personal expense it is, so it never has to ask. The debit day is when the bill hits your bank account."
+              title="כרטיסי אשראי"
+              description="כל כרטיס שייך לאדם אחד — כך האפליקציה יודעת של מי ההוצאה האישית, בלי לשאול. יום החיוב הוא היום שבו החשבון יורד מהבנק."
               action={
                 <Button size="sm" variant="secondary" onClick={() => setCards((c) => [...c, newCard(0)])}>
-                  <Plus className="size-3.5" /> Add card
+                  <Plus className="size-3.5" /> הוספת כרטיס
                 </Button>
               }
             />
@@ -139,7 +139,7 @@ export function OnboardingPage() {
               {cards.map((card, idx) => (
                 <div key={card.key} className="border-line bg-surface-2/40 rounded-lg border p-3">
                   <div className="grid grid-cols-[1fr_1fr_auto] gap-3">
-                    <Field label="Card name">
+                    <Field label="שם הכרטיס">
                       <Input
                         value={card.displayName}
                         placeholder="Max Gold"
@@ -150,7 +150,7 @@ export function OnboardingPage() {
                         }
                       />
                     </Field>
-                    <Field label="Issuer">
+                    <Field label="מנפיק">
                       <Select
                         value={card.issuer}
                         onChange={(e) =>
@@ -170,7 +170,7 @@ export function OnboardingPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        aria-label="Remove card"
+                        aria-label="הסרת כרטיס"
                         disabled={cards.length === 1}
                         onClick={() => setCards((prev) => prev.filter((_, i) => i !== idx))}
                       >
@@ -180,7 +180,7 @@ export function OnboardingPage() {
                   </div>
 
                   <div className="mt-3 grid grid-cols-3 gap-3">
-                    <Field label="Owner">
+                    <Field label="בעלים">
                       <Select
                         value={card.ownerIndex}
                         onChange={(e) =>
@@ -191,11 +191,11 @@ export function OnboardingPage() {
                           )
                         }
                       >
-                        <option value={0}>{names[0] || 'First person'}</option>
-                        <option value={1}>{names[1] || 'Second person'}</option>
+                        <option value={0}>{names[0] || 'אדם ראשון'}</option>
+                        <option value={1}>{names[1] || 'אדם שני'}</option>
                       </Select>
                     </Field>
-                    <Field label="Last 4 digits" hint="Optional">
+                    <Field label="4 ספרות אחרונות" hint="רשות">
                       <Input
                         value={card.last4}
                         maxLength={4}
@@ -210,7 +210,7 @@ export function OnboardingPage() {
                         }
                       />
                     </Field>
-                    <Field label="Debits bank on day">
+                    <Field label="יום החיוב בבנק">
                       <Select
                         value={card.debitDay}
                         onChange={(e) =>
@@ -238,19 +238,19 @@ export function OnboardingPage() {
         {step === 2 && (
           <>
             <CardHeader
-              title="Starting balances"
-              description="Enter what is in the joint account today, then decide how much of it you consider long-term savings. The rest becomes your operating buffer. Personal wallets start at zero."
+              title="יתרות פתיחה"
+              description="הזן מה שיש היום בחשבון המשותף, ואז החלט כמה ממנו אתה מחשיב כחיסכון לטווח ארוך. השאר הופך לכרית התפעול שלך. הארנקים האישיים מתחילים באפס."
             />
             <CardBody className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Current bank balance">
+                <Field label="יתרה נוכחית בבנק">
                   <MoneyInput
                     value={totalRaw}
                     onChange={(e) => setTotalRaw(e.target.value)}
                     placeholder="0"
                   />
                 </Field>
-                <Field label="Of that, treat as savings">
+                <Field label="מתוך זה, לחשוב כחיסכון">
                   <MoneyInput
                     value={savingsRaw}
                     onChange={(e) => setSavingsRaw(e.target.value)}
@@ -273,17 +273,17 @@ export function OnboardingPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="border-line bg-surface-2/40 rounded-lg border p-3">
-                  <div className="text-savings text-[11px] font-medium">Savings Buffer</div>
+                  <div className="text-savings text-[11px] font-medium">כרית חיסכון</div>
                   <div className="tnum mt-1 text-lg font-semibold">{formatAgorot(savings)}</div>
                 </div>
                 <div className="border-line bg-surface-2/40 rounded-lg border p-3">
-                  <div className="text-joint text-[11px] font-medium">Joint Buffer</div>
+                  <div className="text-joint text-[11px] font-medium">כרית משותפת</div>
                   <div className="tnum mt-1 text-lg font-semibold">{formatAgorot(jointBuffer)}</div>
                 </div>
               </div>
 
               {savings > total && (
-                <p className="text-negative text-xs">Savings cannot exceed your bank balance.</p>
+                <p className="text-negative text-xs">החיסכון לא יכול לעלות על היתרה בבנק.</p>
               )}
             </CardBody>
           </>
@@ -292,13 +292,13 @@ export function OnboardingPage() {
         {step === 3 && (
           <>
             <CardHeader
-              title="When do you run the month?"
-              description="Pick the day you sit down to reconcile. Budget periods stay calendar months — this only sets the reminder and the default period."
+              title="מתי אתה סוגר את החודש?"
+              description="בחר את היום שבו אתה מתיישב להשלים חשבון. חודשי התקציב נשארים חודשי לוח שנה — זה רק קובע את התזכורת ואת חודש ברירת המחדל."
             />
             <CardBody className="space-y-4">
               <Field
-                label="Monthly run day"
-                hint="Choose a day after your salary has landed and every card bill has been debited."
+                label="יום סגירת החודש"
+                hint="בחר יום שאחרי שהמשכורת נכנסה וכל חשבונות הכרטיסים ירדו."
                 className="max-w-40"
               >
                 <Select value={closeDay} onChange={(e) => setCloseDay(Number(e.target.value))}>
@@ -314,23 +314,23 @@ export function OnboardingPage() {
                 <div className="border-warning/40 bg-warning/10 flex gap-2.5 rounded-lg border p-3">
                   <AlertTriangle className="text-warning mt-px size-4 shrink-0" />
                   <p className="text-xs leading-relaxed">
-                    One of your cards debits on day {maxDebitDay}. Running on day {closeDay} means that
-                    bill will not be in the period yet. Consider day {maxDebitDay} or later.
+                    אחד הכרטיסים שלך יורד ביום {maxDebitDay}. סגירה ביום {closeDay} אומרת שהחיוב הזה
+                    עדיין לא ייכנס לחודש. שקול יום {maxDebitDay} או מאוחר יותר.
                   </p>
                 </div>
               )}
 
               <div className="border-line bg-surface-2/40 space-y-1.5 rounded-lg border p-4 text-xs">
-                <div className="text-fg-muted font-medium">You are about to create</div>
+                <div className="text-fg-muted font-medium">אתה עומד ליצור</div>
                 <ul className="text-fg-subtle space-y-1">
                   <li>
-                    {names[0]} and {names[1]}, with a personal wallet each starting at ₪0
+                    {names[0]} ו{names[1]}, לכל אחד ארנק אישי שמתחיל ב־₪0
                   </li>
                   <li>
-                    Joint Buffer {formatAgorot(jointBuffer)} · Savings Buffer {formatAgorot(savings)}
+                    כרית משותפת {formatAgorot(jointBuffer)} · כרית חיסכון {formatAgorot(savings)}
                   </li>
                   <li>
-                    {cards.length} card{cards.length === 1 ? '' : 's'} and {31} default categories
+                    {cards.length} כרטיסים ו־{31} קטגוריות ברירת מחדל
                   </li>
                 </ul>
               </div>
@@ -343,15 +343,15 @@ export function OnboardingPage() {
 
       <div className="mt-5 flex items-center justify-between">
         <Button variant="ghost" onClick={() => setStep((s) => s - 1)} disabled={step === 0 || saving}>
-          <ArrowLeft className="size-4" /> Back
+          <ArrowLeft className="dir-icon size-4" /> חזרה
         </Button>
         {step < STEPS.length - 1 ? (
           <Button onClick={() => setStep((s) => s + 1)} disabled={!canAdvance}>
-            Continue <ArrowRight className="size-4" />
+            המשך <ArrowRight className="dir-icon size-4" />
           </Button>
         ) : (
           <Button onClick={finish} disabled={saving}>
-            {saving ? 'Creating…' : 'Create ledger'}
+            {saving ? 'יוצר…' : 'צור את הספרים'}
           </Button>
         )}
       </div>

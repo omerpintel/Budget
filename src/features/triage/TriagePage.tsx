@@ -114,7 +114,7 @@ export function TriagePage({
         };
         const affected = await commitDecision(row, decision, next.applyToMerchant);
         setLastAction(
-          affected > 1 ? `Applied to ${affected} transactions from this merchant` : 'Saved',
+          affected > 1 ? `הוחל על ${affected} תנועות מבית העסק הזה` : 'נשמר',
         );
         await qc.invalidateQueries({ queryKey: ['triage'] });
         setIndex(0);
@@ -191,12 +191,12 @@ export function TriagePage({
     <>
       {!embedded && (
         <PageHeader
-          title="Triage"
-          description="Confirm what the app worked out, and say what is personal. Everything you confirm is remembered."
+          title="מיון"
+          description="אשר את מה שהאפליקציה זיהתה, וסמן מה אישי. כל מה שתאשר נשמר לפעם הבאה."
           action={
             <div className="flex shrink-0 items-center gap-2">
               <Select className="h-8 w-40 text-xs" value={periodId} onChange={(e) => setPeriodId(e.target.value)}>
-                <option value="">All periods</option>
+                <option value="">כל החודשים</option>
                 {periods.map((p) => (
                   <option key={p.id} value={p.id}>
                     {periodLabel(p.year, p.month)}
@@ -204,7 +204,7 @@ export function TriagePage({
                 ))}
               </Select>
               <Button size="sm" variant="ghost" onClick={() => setShowHelp((v) => !v)}>
-                <Keyboard className="size-3.5" /> Shortcuts
+                <Keyboard className="size-3.5" /> קיצורי מקלדת
               </Button>
             </div>
           }
@@ -215,8 +215,8 @@ export function TriagePage({
         <Card>
           <EmptyState
             icon={<Check className="size-8" strokeWidth={1.25} />}
-            title="Nothing left to review"
-            description="Every transaction in this period has been confirmed. Import a statement to get more."
+            title="לא נשאר מה לבדוק"
+            description="כל התנועות בחודש הזה אושרו. ייבא דף חיוב כדי להוסיף עוד."
           />
         </Card>
       ) : (
@@ -224,8 +224,8 @@ export function TriagePage({
           <div className="mb-4">
             <div className="text-fg-muted mb-1.5 flex items-center justify-between text-xs">
               <span>
-                {queue.length} to review
-                {auto.length > 0 ? ` · ${auto.length} auto-applied` : ''}
+                {queue.length} לבדיקה
+                {auto.length > 0 ? ` · ${auto.length} הוחלו אוטומטית` : ''}
               </span>
               {lastAction && <span className="text-positive">{lastAction}</span>}
             </div>
@@ -255,8 +255,8 @@ export function TriagePage({
             <Card>
               <EmptyState
                 icon={<Check className="size-8" strokeWidth={1.25} />}
-                title="Queue is clear"
-                description="Only auto-applied rows remain. Review them below and accept."
+                title="התור ריק"
+                description="נשארו רק תנועות שהוחלו אוטומטית. עבור עליהן למטה ואשר."
               />
             </Card>
           )}
@@ -266,22 +266,22 @@ export function TriagePage({
           {auto.length > 0 && (
             <Card className="mt-4">
               <CardHeader
-                title={`${auto.length} auto-applied`}
-                description="Resolved from your history, a rule, or a confident model answer. Skim and accept."
+                title={`${auto.length} הוחלו אוטומטית`}
+                description="נקבעו לפי ההיסטוריה שלך, כלל, או תשובה בטוחה של המודל. עבור ואשר."
                 action={
                   <div className="flex gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setShowAuto((v) => !v)}>
-                      {showAuto ? 'Hide' : 'Review'}
+                      {showAuto ? 'הסתרה' : 'בדיקה'}
                     </Button>
                     <Button
                       size="sm"
                       onClick={async () => {
                         await acceptAutoApplied(auto);
-                        setLastAction(`Accepted ${auto.length}`);
+                        setLastAction(`אושרו ${auto.length}`);
                         await qc.invalidateQueries({ queryKey: ['triage'] });
                       }}
                     >
-                      Accept all
+                      אישור הכל
                     </Button>
                   </div>
                 }
@@ -300,7 +300,7 @@ export function TriagePage({
                           <td className="w-28 px-4 py-2">
                             <SourceBadge row={row} />
                           </td>
-                          <td className="tnum w-24 px-4 py-2 text-right">
+                          <td className="tnum w-24 px-4 py-2 text-end">
                             {formatAgorot(row.direction === 'out' ? -row.amount : row.amount)}
                           </td>
                         </tr>
@@ -326,7 +326,7 @@ function SourceBadge({ row }: { row: TriageRow }) {
       </span>
     );
   }
-  return <span className="text-fg-subtle">{row.categorization_source === 'rule' ? 'Rule' : 'Learned'}</span>;
+  return <span className="text-fg-subtle">{row.categorization_source === 'rule' ? 'כלל' : 'נלמד'}</span>;
 }
 
 function TriageCard({
@@ -350,7 +350,7 @@ function TriageCard({
   onCommit: () => void;
   onMove: (delta: number) => void;
 }) {
-  const owner = row.account_owner_name ?? 'the card owner';
+  const owner = row.account_owner_name ?? 'בעל הכרטיס';
   return (
     <Card>
       <CardBody className="p-6">
@@ -358,11 +358,11 @@ function TriageCard({
           <span>
             {row.transaction_date} · {row.account_name}
             {row.installment_total
-              ? ` · payment ${row.installment_current}/${row.installment_total}`
+              ? ` · תשלום ${row.installment_current}/${row.installment_total}`
               : ''}
           </span>
           <span>
-            {position.index + 1} of {position.total}
+            {position.index + 1} מתוך {position.total}
           </span>
         </div>
 
@@ -383,8 +383,8 @@ function TriageCard({
         {row.categorization_source === 'llm' && (
           <p className="text-fg-subtle mt-2 flex items-center gap-1.5 text-xs">
             <Sparkles className="size-3" />
-            Model suggested {row.category_name} at {Math.round((row.llm_confidence ?? 0) * 100)}%
-            confidence
+            המודל הציע {row.category_name} ברמת ביטחון של{' '}
+            {Math.round((row.llm_confidence ?? 0) * 100)}%
           </p>
         )}
 
@@ -409,13 +409,13 @@ function TriageCard({
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <label className="text-fg-muted block text-xs">
-            Any other category
+            קטגוריה אחרת
             <Select
               className="mt-1.5"
               value={draft.categoryId ?? ''}
               onChange={(e) => onDraft({ ...draft, categoryId: e.target.value || null })}
             >
-              <option value="">— none —</option>
+              <option value="">— ללא —</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -435,7 +435,7 @@ function TriageCard({
               onDraft({ ...draft, wallet: draft.wallet === 'personal' ? 'joint' : 'personal' })
             }
           >
-            {draft.wallet === 'personal' ? `${owner}'s personal` : 'Joint'}
+            {draft.wallet === 'personal' ? `אישי של ${owner}` : 'משותף'}
           </Toggle>
 
           {row.siblings > 0 && (
@@ -444,7 +444,7 @@ function TriageCard({
               shortcut="A"
               onClick={() => onDraft({ ...draft, applyToMerchant: !draft.applyToMerchant })}
             >
-              Apply to {row.siblings + 1} from this merchant
+              החל על {row.siblings + 1} תנועות מבית העסק הזה
             </Toggle>
           )}
 
@@ -455,7 +455,7 @@ function TriageCard({
             icon={<PiggyBank className="size-3.5" />}
             onClick={() => onDraft({ ...draft, fundFromSavings: !draft.fundFromSavings })}
           >
-            Fund from savings
+            מימון מהחיסכון
           </Toggle>
 
           <Toggle
@@ -464,22 +464,21 @@ function TriageCard({
             icon={<CircleSlash className="size-3.5" />}
             onClick={() => onDraft({ ...draft, excluded: !draft.excluded })}
           >
-            Exclude
+            החרגה
           </Toggle>
         </div>
 
         {draft.wallet === 'personal' && (
           <p className="text-fg-subtle mt-3 flex items-center gap-1.5 text-xs">
             <Lock className="size-3" />
-            The vendor name will be hidden everywhere; only {owner} sees it. The amount still comes out
-            of {owner}&rsquo;s wallet.
+            שם בית העסק יוסתר בכל מקום; רק {owner} יראה אותו. הסכום עדיין יורד מהארנק של {owner}.
           </p>
         )}
 
         <div className="border-line mt-6 flex items-center justify-between border-t pt-4">
           <div className="flex gap-1">
             <Button size="sm" variant="ghost" onClick={() => onMove(-1)} disabled={position.index === 0}>
-              <ChevronLeft className="size-4" /> Back
+              <ChevronLeft className="dir-icon size-4" /> חזרה
             </Button>
             <Button
               size="sm"
@@ -487,12 +486,12 @@ function TriageCard({
               onClick={() => onMove(1)}
               disabled={position.index >= position.total - 1}
             >
-              Skip <ChevronRight className="size-4" />
+              דילוג <ChevronRight className="dir-icon size-4" />
             </Button>
           </div>
           <Button size="sm" onClick={onCommit}>
-            <Check className="size-4" /> Accept
-            <Kbd className="border-brand-fg/30 bg-brand-fg/10 text-brand-fg ml-1">↵</Kbd>
+            <Check className="size-4" /> אישור
+            <Kbd className="border-brand-fg/30 bg-brand-fg/10 text-brand-fg ms-1">↵</Kbd>
           </Button>
         </div>
       </CardBody>

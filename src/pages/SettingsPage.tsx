@@ -69,16 +69,16 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Local configuration. Nothing leaves this machine." />
+      <PageHeader title="הגדרות" description="הגדרות מקומיות. שום דבר לא עוזב את המחשב הזה." />
 
       <div className="space-y-4">
         <Card>
           <CardHeader
-            title="Monthly run"
-            description="Budget periods are always calendar months. This only decides when you are reminded to sit down."
+            title="סגירת חודש"
+            description="חודשי התקציב הם תמיד חודשי לוח שנה. זה רק קובע מתי תקבל תזכורת להתיישב על זה."
           />
           <CardBody className="space-y-3">
-            <Field label="Run day of month" className="max-w-40">
+            <Field label="יום סגירת החודש" className="max-w-40">
               <Select
                 value={closeDay}
                 onChange={(e) => save.mutate({ key: SETTING_KEYS.closeDay, value: e.target.value })}
@@ -94,8 +94,8 @@ export function SettingsPage() {
               <div className="border-warning/40 bg-warning/10 flex gap-2.5 rounded-lg border p-3">
                 <AlertTriangle className="text-warning mt-px size-4 shrink-0" />
                 <p className="text-xs leading-relaxed">
-                  A card debits on day {maxDebitDay}. Running on day {closeDay} leaves that bill out of
-                  the period.
+                  כרטיס יורד ביום {maxDebitDay}. סגירה ביום {closeDay} משאירה את החיוב הזה מחוץ
+                  לחודש.
                 </p>
               </div>
             )}
@@ -104,18 +104,18 @@ export function SettingsPage() {
 
         <Card>
           <CardHeader
-            title="Local AI"
-            description="Ollama categorises new merchants. If it is offline the app still works — everything lands in Uncategorized."
+            title="בינה מלאכותית מקומית"
+            description="Ollama מסווג בתי עסק חדשים. אם הוא לא זמין האפליקציה עדיין עובדת — הכל נוחת תחת ללא קטגוריה."
           />
           <CardBody className="space-y-3">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Ollama URL">
+              <Field label="כתובת Ollama">
                 <Input
                   defaultValue={settings[SETTING_KEYS.ollamaUrl]}
                   onBlur={(e) => save.mutate({ key: SETTING_KEYS.ollamaUrl, value: e.target.value })}
                 />
               </Field>
-              <Field label="Model">
+              <Field label="מודל">
                 {status?.reachable && status.models.length > 0 ? (
                   <Select
                     value={settings[SETTING_KEYS.ollamaModel]}
@@ -147,25 +147,25 @@ export function SettingsPage() {
                   setChecking(false);
                 }}
               >
-                {checking ? 'Checking…' : 'Test connection'}
+                {checking ? 'בודק…' : 'בדיקת חיבור'}
               </Button>
               {status && (
                 <span className="flex items-center gap-1.5 text-xs">
                   {!status.reachable ? (
                     <>
                       <XCircle className="text-negative size-3.5" />
-                      <span className="text-fg-muted">Not reachable — {status.error}</span>
+                      <span className="text-fg-muted">אין חיבור — {status.error}</span>
                     </>
                   ) : status.models.length === 0 ? (
                     <>
                       <AlertTriangle className="text-warning size-3.5" />
-                      <span className="text-fg-muted">Ollama is running, but no models are pulled</span>
+                      <span className="text-fg-muted">Ollama רץ, אבל לא הורדו מודלים</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle2 className="text-positive size-3.5" />
                       <span className="text-fg-muted">
-                        Connected · {status.models.length} model{status.models.length === 1 ? '' : 's'}
+                        מחובר · {status.models.length === 1 ? 'מודל אחד' : `${status.models.length} מודלים`}
                       </span>
                     </>
                   )}
@@ -177,13 +177,13 @@ export function SettingsPage() {
               <p className="text-fg-subtle text-xs leading-relaxed">
                 {status.reachable ? (
                   <>
-                    Pull a model to enable categorisation:{' '}
-                    <code className="text-fg">ollama pull gemma3:12b</code> (or{' '}
-                    <code className="text-fg">gemma3:4b</code> on a smaller GPU).
+                    הורד מודל כדי להפעיל סיווג אוטומטי:{' '}
+                    <code className="text-fg">ollama pull gemma3:12b</code> (או{' '}
+                    <code className="text-fg">gemma3:4b</code> על כרטיס מסך חלש יותר).
                   </>
                 ) : (
                   <>
-                    Start the Ollama service, then run{' '}
+                    הפעל את שירות Ollama, ואז הרץ{' '}
                     <code className="text-fg">ollama pull gemma3:12b</code>.
                   </>
                 )}
@@ -196,8 +196,8 @@ export function SettingsPage() {
                 <div className="border-warning/40 bg-warning/10 flex gap-2.5 rounded-lg border p-3">
                   <AlertTriangle className="text-warning mt-px size-4 shrink-0" />
                   <p className="text-xs leading-relaxed">
-                    <code>{settings[SETTING_KEYS.ollamaModel]}</code> is not installed. Pick an
-                    installed model above, or run{' '}
+                    <code>{settings[SETTING_KEYS.ollamaModel]}</code> אינו מותקן. בחר מודל מותקן
+                    מלמעלה, או הרץ{' '}
                     <code>ollama pull {settings[SETTING_KEYS.ollamaModel]}</code>.
                   </p>
                 </div>
@@ -207,17 +207,17 @@ export function SettingsPage() {
 
         <Card>
           <CardHeader
-            title="Cards & accounts"
-            description="Card ownership decides whose personal wallet an expense belongs to."
+            title="כרטיסים וחשבונות"
+            description="הבעלות על הכרטיס קובעת לאיזה ארנק אישי שייכת ההוצאה."
           />
           <CardBody>
             <table className="w-full text-xs">
               <thead className="text-fg-subtle border-line border-b">
-                <tr className="text-left">
-                  <th className="pb-2 font-medium">Card</th>
-                  <th className="pb-2 font-medium">Issuer</th>
-                  <th className="pb-2 font-medium">Owner</th>
-                  <th className="pb-2 text-right font-medium">Debit day</th>
+                <tr className="text-start">
+                  <th className="pb-2 font-medium">כרטיס</th>
+                  <th className="pb-2 font-medium">מנפיק</th>
+                  <th className="pb-2 font-medium">בעלים</th>
+                  <th className="pb-2 text-end font-medium">יום חיוב</th>
                 </tr>
               </thead>
               <tbody>
@@ -231,7 +231,7 @@ export function SettingsPage() {
                       {ISSUERS.find((i) => i.value === a.issuer)?.label ?? a.issuer}
                     </td>
                     <td className="text-fg-muted py-2.5">{personName(a.owner_person_id)}</td>
-                    <td className="tnum text-fg-muted py-2.5 text-right">{a.debit_day ?? '—'}</td>
+                    <td className="tnum text-fg-muted py-2.5 text-end">{a.debit_day ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -241,15 +241,15 @@ export function SettingsPage() {
 
         <Card>
           <CardHeader
-            title="Backup"
-            description="Your entire ledger is one SQLite file. Export it somewhere safe now and then."
+            title="גיבוי"
+            description="כל הספרים שלך הם קובץ SQLite אחד. ייצא אותו מדי פעם למקום בטוח."
           />
           <CardBody className="flex items-center gap-3">
             <Button size="sm" variant="secondary" onClick={() => downloadBackup()}>
-              <Download className="size-3.5" /> Export database
+              <Download className="size-3.5" /> ייצוא מסד הנתונים
             </Button>
             <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()}>
-              <Upload className="size-3.5" /> Restore from file
+              <Upload className="size-3.5" /> שחזור מקובץ
             </Button>
             <input
               ref={fileRef}
@@ -263,7 +263,7 @@ export function SettingsPage() {
             />
             {settings[SETTING_KEYS.lastBackupAt] && (
               <span className="text-fg-subtle text-xs">
-                Last export {new Date(settings[SETTING_KEYS.lastBackupAt]).toLocaleDateString('en-GB')}
+                ייצוא אחרון {new Date(settings[SETTING_KEYS.lastBackupAt]).toLocaleDateString('he-IL')}
               </span>
             )}
             {message && <span className="text-negative text-xs">{message}</span>}
@@ -278,27 +278,27 @@ export function SettingsPage() {
 
         <Card className="border-negative/30">
           <CardHeader
-            title="Erase everything"
-            description={`Deletes all ${counts.transactions} transactions, ${counts.periods} period(s) and ${counts.accounts} account(s), then restarts onboarding. Export a backup first — this cannot be undone.`}
+            title="מחיקת הכל"
+            description={`מוחק את כל ${counts.transactions} התנועות, ${counts.periods} החודשים ו־${counts.accounts} החשבונות, ומתחיל את ההגדרה מההתחלה. ייצא גיבוי קודם — אי אפשר לבטל את זה.`}
           />
           <CardBody className="flex items-end gap-3">
-            <Field label="Type ERASE to confirm" className="max-w-48">
+            <Field label="הקלד מחק כדי לאשר" className="max-w-48">
               <Input
                 value={resetConfirm}
                 onChange={(e) => setResetConfirm(e.target.value)}
-                placeholder="ERASE"
+                placeholder="מחק"
               />
             </Field>
             <Button
               variant="danger"
-              disabled={resetConfirm !== 'ERASE'}
+              disabled={resetConfirm !== 'מחק'}
               onClick={async () => {
                 await resetAllData();
                 window.location.hash = '#/onboarding';
                 window.location.reload();
               }}
             >
-              <Trash2 className="size-3.5" /> Erase all data
+              <Trash2 className="size-3.5" /> מחיקת כל הנתונים
             </Button>
           </CardBody>
         </Card>

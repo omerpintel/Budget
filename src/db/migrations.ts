@@ -301,4 +301,70 @@ const initialSchema: Migration = {
   ],
 };
 
-export const migrations: Migration[] = [initialSchema];
+/**
+ * Renames the seeded categories and wallets to Hebrew. Each statement matches on the
+ * original English name as well as the slug, so anything the user renamed is left alone.
+ */
+const hebrewDefaults: Migration = {
+  version: 2,
+  name: 'hebrew_default_names',
+  statements: [
+    ...(
+      [
+        ['salary', 'Salary', 'משכורת'],
+        ['other-income', 'Other Income', 'הכנסה אחרת'],
+        ['refund', 'Refunds & Reimbursements', 'זיכויים והחזרים'],
+        ['rent', 'Rent', 'שכר דירה'],
+        ['mortgage', 'Mortgage', 'משכנתא'],
+        ['arnona', 'Arnona', 'ארנונה'],
+        ['utilities', 'Electricity, Water & Gas', 'חשמל, מים וגז'],
+        ['internet-tv', 'Internet & TV', 'אינטרנט וטלוויזיה'],
+        ['mobile', 'Mobile', 'סלולר'],
+        ['insurance', 'Insurance', 'ביטוח'],
+        ['health', 'Health & Kupat Holim', 'בריאות וקופת חולים'],
+        ['vehicle-fixed', 'Vehicle Fixed Costs', 'הוצאות רכב קבועות'],
+        ['education', 'Education & Childcare', 'חינוך ומעונות'],
+        ['loans', 'Loan Repayments', 'החזרי הלוואות'],
+        ['groceries', 'Groceries', 'סופר ומכולת'],
+        ['restaurants', 'Restaurants & Cafes', 'מסעדות ובתי קפה'],
+        ['fuel', 'Fuel', 'דלק'],
+        ['transport', 'Transport & Parking', 'תחבורה וחניה'],
+        ['pharmacy', 'Pharmacy & Toiletries', 'פארם וטיפוח'],
+        ['home', 'Home & Furnishing', 'בית וריהוט'],
+        ['clothing', 'Clothing', 'ביגוד והנעלה'],
+        ['entertainment', 'Entertainment & Culture', 'בילויים ותרבות'],
+        ['subscriptions', 'Subscriptions & Digital', 'מנויים ודיגיטל'],
+        ['travel', 'Travel & Vacation', 'טיולים וחופשות'],
+        ['gifts', 'Gifts & Events', 'מתנות ואירועים'],
+        ['pets', 'Pets', 'חיות מחמד'],
+        ['sport', 'Sport & Fitness', 'ספורט וכושר'],
+        ['kids', 'Kids', 'ילדים'],
+        ['misc', 'Miscellaneous', 'שונות'],
+        ['uncategorized', 'Uncategorized', 'ללא קטגוריה'],
+        ['savings-contribution', 'Savings Contribution', 'הפקדה לחיסכון'],
+        ['personal-allowance', 'Personal Allowance', 'דמי כיס אישיים'],
+        ['transfer', 'Internal Transfer', 'העברה פנימית'],
+      ] as const
+    ).map(
+      ([slug, en, he]) =>
+        `UPDATE categories SET name = '${he}' WHERE slug = '${slug}' AND name = '${en}'`,
+    ),
+
+    `UPDATE wallets SET name = 'כרית משותפת' WHERE kind = 'joint_buffer' AND name = 'Joint Buffer'`,
+    `UPDATE wallets SET name = 'חיסכון' WHERE kind = 'savings' AND name = 'Savings Buffer'`,
+  ],
+};
+
+/** Personal wallets were seeded as "<person>'s Wallet" from the person's own name. */
+const hebrewPersonalWallets: Migration = {
+  version: 3,
+  name: 'hebrew_personal_wallet_names',
+  statements: [
+    `UPDATE wallets SET name = 'הארנק של ' || (SELECT p.name FROM people p WHERE p.id = wallets.person_id)
+       WHERE kind = 'personal'
+         AND person_id IS NOT NULL
+         AND name = (SELECT p.name FROM people p WHERE p.id = wallets.person_id) || '''s Wallet'`,
+  ],
+};
+
+export const migrations: Migration[] = [initialSchema, hebrewDefaults, hebrewPersonalWallets];

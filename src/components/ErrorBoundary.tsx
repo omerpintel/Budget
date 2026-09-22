@@ -34,10 +34,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             title={
               <span className="flex items-center gap-2">
                 <AlertTriangle className="text-negative size-4" />
-                Something broke on this screen
+                משהו נשבר במסך הזה
               </span>
             }
-            description="Your data is untouched. Export a copy before reloading if you want to be certain."
+            description="הנתונים שלך לא נפגעו. אפשר לייצא עותק לפני הרענון, ליתר ביטחון."
           />
           <CardBody className="space-y-4">
             <pre className="border-line bg-surface-2 text-fg-muted max-h-40 overflow-auto rounded-lg border p-3 text-[11px] whitespace-pre-wrap">
@@ -45,10 +45,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
             </pre>
             <div className="flex gap-2">
               <Button size="sm" onClick={() => window.location.reload()}>
-                <RotateCcw className="size-3.5" /> Reload
+                <RotateCcw className="size-3.5" /> רענון
               </Button>
               <Button size="sm" variant="secondary" onClick={() => void downloadBackup()}>
-                <Download className="size-3.5" /> Export database
+                <Download className="size-3.5" /> ייצוא מסד הנתונים
               </Button>
             </div>
           </CardBody>

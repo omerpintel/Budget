@@ -42,7 +42,7 @@ export function WalletCard({
       >
         {formatAgorot(balance)}
       </div>
-      <div className="text-fg-subtle mt-1 text-[11px]">{caption ?? 'Opening balance'}</div>
+      <div className="text-fg-subtle mt-1 text-[11px]">{caption ?? 'יתרת פתיחה'}</div>
     </div>
   );
 }

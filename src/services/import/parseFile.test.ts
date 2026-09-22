@@ -143,7 +143,7 @@ describe('parseGrid', () => {
       amount: 24590,
       direction: 'out',
     });
-    expect(result.skipped.map((s) => s.reason)).toContain('Summary row');
+    expect(result.skipped.map((s) => s.reason)).toContain('שורת סיכום');
   });
 
   it('captures installments and foreign currency from a Max statement', () => {

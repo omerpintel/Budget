@@ -43,10 +43,10 @@ export async function completeOnboarding(draft: OnboardingDraft): Promise<void> 
     params: [uuid(), kind, personId, name, opening, ts, ts, ts] as Array<string | number | null>,
   });
 
-  statements.push(wallet('joint_buffer', 'Joint Buffer', null, draft.jointBufferOpening));
-  statements.push(wallet('savings', 'Savings Buffer', null, draft.savingsOpening));
+  statements.push(wallet('joint_buffer', 'כרית משותפת', null, draft.jointBufferOpening));
+  statements.push(wallet('savings', 'חיסכון', null, draft.savingsOpening));
   draft.people.forEach((person, i) => {
-    statements.push(wallet('personal', `${person.name}'s Wallet`, personIds[i], 0));
+    statements.push(wallet('personal', `הארנק של ${person.name}`, personIds[i], 0));
   });
 
   draft.cards.forEach((card, i) => {

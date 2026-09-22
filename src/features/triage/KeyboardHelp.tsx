@@ -6,14 +6,14 @@ export interface Shortcut {
 }
 
 export const SHORTCUTS: Shortcut[] = [
-  { keys: '1–9', label: 'Pick category' },
-  { keys: 'Enter', label: 'Accept and next' },
-  { keys: 'P', label: 'Toggle personal' },
-  { keys: 'A', label: 'Apply to all from merchant' },
-  { keys: 'S', label: 'Fund from savings' },
-  { keys: 'X', label: 'Exclude' },
-  { keys: '← →', label: 'Previous / skip' },
-  { keys: '?', label: 'Toggle this help' },
+  { keys: '1–9', label: 'בחירת קטגוריה' },
+  { keys: 'Enter', label: 'אישור ומעבר לבא' },
+  { keys: 'P', label: 'מעבר לאישי' },
+  { keys: 'A', label: 'החל על הכל מאותו בית עסק' },
+  { keys: 'S', label: 'מימון מהחיסכון' },
+  { keys: 'X', label: 'החרגה' },
+  { keys: '← →', label: 'הקודם / דילוג' },
+  { keys: '?', label: 'הצגת העזרה הזו' },
 ];
 
 export function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {

@@ -35,8 +35,8 @@ export function DropZone({ onFile, disabled }: { onFile: (file: File) => void; d
       )}
     >
       <UploadCloud className="text-fg-subtle size-7" strokeWidth={1.25} />
-      <p className="mt-3 text-sm font-medium">Drop a statement here</p>
-      <p className="text-fg-subtle mt-1 text-xs">CSV or XLSX exported from your card issuer or bank</p>
+      <p className="mt-3 text-sm font-medium">גרור לכאן דף חיוב</p>
+      <p className="text-fg-subtle mt-1 text-xs">CSV או XLSX שיוצאו מאתר המנפיק או הבנק</p>
       <input
         ref={inputRef}
         type="file"

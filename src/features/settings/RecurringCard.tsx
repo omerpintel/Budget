@@ -66,15 +66,15 @@ export function RecurringCard() {
   return (
     <Card>
       <CardHeader
-        title="Recurring bank movements"
-        description="Templates that pre-fill each monthly run — salaries in, rent and standing orders out. Amounts stay editable every month."
+        title="תנועות בנק קבועות"
+        description="תבניות שממלאות מראש כל סגירת חודש — משכורות נכנסות, שכר דירה והוראות קבע יוצאים. הסכומים נשארים ניתנים לעריכה בכל חודש."
       />
       <CardBody className="space-y-4">
         <div className="grid grid-cols-7 items-end gap-3">
-          <Field label="Name" className="col-span-2">
-            <Input value={name} placeholder="Rent" onChange={(e) => setName(e.target.value)} />
+          <Field label="שם" className="col-span-2">
+            <Input value={name} placeholder="שכר דירה" onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Direction">
+          <Field label="כיוון">
             <Select
               value={direction}
               onChange={(e) => {
@@ -82,14 +82,14 @@ export function RecurringCard() {
                 setCategoryId('');
               }}
             >
-              <option value="out">Out</option>
-              <option value="in">In</option>
+              <option value="out">יוצא</option>
+              <option value="in">נכנס</option>
             </Select>
           </Field>
-          <Field label="Typical amount">
+          <Field label="סכום אופייני">
             <MoneyInput value={amountRaw} onChange={(e) => setAmountRaw(e.target.value)} />
           </Field>
-          <Field label="Day">
+          <Field label="יום">
             <Select value={day} onChange={(e) => setDay(e.target.value)}>
               {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                 <option key={d} value={d}>
@@ -98,10 +98,10 @@ export function RecurringCard() {
               ))}
             </Select>
           </Field>
-          <Field label={direction === 'in' ? 'Whose income' : 'Category'}>
+          <Field label={direction === 'in' ? 'הכנסה של מי' : 'קטגוריה'}>
             {direction === 'in' ? (
               <Select value={personId} onChange={(e) => setPersonId(e.target.value)}>
-                <option value="">Household</option>
+                <option value="">משק הבית</option>
                 {people.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -110,7 +110,7 @@ export function RecurringCard() {
               </Select>
             ) : (
               <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                <option value="">— none —</option>
+                <option value="">— ללא —</option>
                 {relevantCategories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -120,13 +120,13 @@ export function RecurringCard() {
             )}
           </Field>
           <Button disabled={!name.trim()} onClick={() => add.mutate()}>
-            <Plus className="size-4" /> Add
+            <Plus className="size-4" /> הוספה
           </Button>
         </div>
 
         {entries.length === 0 ? (
           <p className="text-fg-subtle text-xs">
-            No templates yet. Add your rent and both salaries so the monthly run starts pre-filled.
+            עדיין אין תבניות. הוסף את שכר הדירה ואת שתי המשכורות כדי שסגירת החודש תתחיל מלאה.
           </p>
         ) : (
           <table className="w-full text-xs">
@@ -135,7 +135,7 @@ export function RecurringCard() {
                 <tr key={entry.id} className="border-line/60 border-b last:border-0">
                   <td className="py-2 font-medium">{entry.name}</td>
                   <td className="text-fg-muted py-2">
-                    {entry.direction === 'in' ? 'Income' : 'Expense'}
+                    {entry.direction === 'in' ? 'הכנסה' : 'הוצאה'}
                     {entry.person_id
                       ? ` · ${people.find((p) => p.id === entry.person_id)?.name ?? ''}`
                       : entry.category_id
@@ -143,13 +143,13 @@ export function RecurringCard() {
                         : ''}
                   </td>
                   <td className="text-fg-muted py-2">
-                    {entry.day_of_month ? `Day ${entry.day_of_month}` : ''}
+                    {entry.day_of_month ? `יום ${entry.day_of_month}` : ''}
                   </td>
-                  <td className="tnum py-2 text-right">{formatAgorot(entry.default_amount)}</td>
-                  <td className="w-8 pl-2 text-right">
+                  <td className="tnum py-2 text-end">{formatAgorot(entry.default_amount)}</td>
+                  <td className="w-8 ps-2 text-end">
                     <button
                       type="button"
-                      aria-label={`Remove ${entry.name}`}
+                      aria-label={`הסרת ${entry.name}`}
                       className="text-fg-subtle hover:text-negative"
                       onClick={() => remove.mutate(entry.id)}
                     >

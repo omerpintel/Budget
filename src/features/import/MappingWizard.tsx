@@ -4,21 +4,21 @@ import type { ColumnField, ColumnMap } from '@/services/import/issuers';
 import type { CellValue } from '@/services/import/xlsx';
 
 const REQUIRED: Array<{ field: ColumnField; label: string }> = [
-  { field: 'transactionDate', label: 'Transaction date' },
-  { field: 'description', label: 'Merchant / description' },
+  { field: 'transactionDate', label: 'תאריך העסקה' },
+  { field: 'description', label: 'בית עסק / תיאור' },
 ];
 
 const AMOUNT: Array<{ field: ColumnField; label: string }> = [
-  { field: 'chargeAmount', label: 'Charged amount' },
-  { field: 'debit', label: 'Debit column' },
-  { field: 'credit', label: 'Credit column' },
+  { field: 'chargeAmount', label: 'סכום החיוב' },
+  { field: 'debit', label: 'עמודת חובה' },
+  { field: 'credit', label: 'עמודת זכות' },
 ];
 
 const OPTIONAL: Array<{ field: ColumnField; label: string }> = [
-  { field: 'originalAmount', label: 'Original amount' },
-  { field: 'originalCurrency', label: 'Original currency' },
-  { field: 'installment', label: 'Installments' },
-  { field: 'notes', label: 'Notes' },
+  { field: 'originalAmount', label: 'סכום מקורי' },
+  { field: 'originalCurrency', label: 'מטבע מקורי' },
+  { field: 'installment', label: 'תשלומים' },
+  { field: 'notes', label: 'הערות' },
 ];
 
 export function MappingWizard({
@@ -38,7 +38,7 @@ export function MappingWizard({
   const columnCount = Math.max(...preview.map((r) => r.length), 0);
   const columnLabel = (i: number) => {
     const header = headerRow[i];
-    const text = header == null || String(header).trim() === '' ? `Column ${i + 1}` : String(header);
+    const text = header == null || String(header).trim() === '' ? `עמודה ${i + 1}` : String(header);
     return `${i + 1}. ${text}`;
   };
 
@@ -48,7 +48,7 @@ export function MappingWizard({
         value={columnMap[field] ?? ''}
         onChange={(e) => onColumnChange(field, e.target.value === '' ? undefined : Number(e.target.value))}
       >
-        <option value="">— none —</option>
+        <option value="">— ללא —</option>
         {Array.from({ length: columnCount }, (_, i) => (
           <option key={i} value={i}>
             {columnLabel(i)}
@@ -61,14 +61,14 @@ export function MappingWizard({
   return (
     <div className="space-y-5">
       <Field
-        label="Which row holds the column headers?"
-        hint="Israeli exports usually start with a title and account summary."
+        label="באיזו שורה נמצאות כותרות העמודות?"
+        hint="בייצואים ישראליים בדרך כלל מופיעים קודם כותרת וסיכום חשבון."
         className="max-w-64"
       >
         <Select value={headerRowIndex} onChange={(e) => onHeaderRowChange(Number(e.target.value))}>
           {preview.map((row, i) => (
             <option key={i} value={i}>
-              Row {i + 1} — {row.filter((c) => c != null && String(c).trim() !== '').slice(0, 3).join(' · ') || '(empty)'}
+              שורה {i + 1} — {row.filter((c) => c != null && String(c).trim() !== '').slice(0, 3).join(' · ') || '(ריקה)'}
             </option>
           ))}
         </Select>
@@ -94,19 +94,19 @@ export function MappingWizard({
       </div>
 
       <div>
-        <div className="text-fg-muted mb-2 text-xs font-medium">Required</div>
+        <div className="text-fg-muted mb-2 text-xs font-medium">חובה</div>
         <div className="grid grid-cols-2 gap-3">{REQUIRED.map((f) => picker(f.field, f.label))}</div>
       </div>
 
       <div>
         <div className="text-fg-muted mb-2 text-xs font-medium">
-          Amount — a charged amount, or a debit/credit pair
+          סכום — סכום חיוב אחד, או זוג של חובה/זכות
         </div>
         <div className="grid grid-cols-3 gap-3">{AMOUNT.map((f) => picker(f.field, f.label))}</div>
       </div>
 
       <div>
-        <div className="text-fg-muted mb-2 text-xs font-medium">Optional</div>
+        <div className="text-fg-muted mb-2 text-xs font-medium">רשות</div>
         <div className="grid grid-cols-4 gap-3">{OPTIONAL.map((f) => picker(f.field, f.label))}</div>
       </div>
     </div>

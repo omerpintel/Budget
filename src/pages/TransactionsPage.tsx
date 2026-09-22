@@ -10,35 +10,44 @@ import { ManualEntryForm, type ManualDraft } from '@/features/transactions/Manua
 import { listTransactions, createManualTransaction, deleteTransaction } from '@/data/transactions';
 import { listCategories } from '@/data/categories';
 import { listPeople } from '@/data/people';
-import { listPeriods, periodForDebitDate, ensurePeriod } from '@/data/periods';
+import { findPeriod, periodForDebitDate, ensurePeriod } from '@/data/periods';
 import { ensureManualAccount } from '@/data/accounts';
 import { applyCorrection, categorizePending } from '@/services/categorize/apply';
 import { categorizeWithAi, countUnresolved } from '@/services/ollama/categorize';
 import type { ClassifyProgress } from '@/services/ollama/client';
 import { formatAgorot, parseMoneyInput, periodLabel } from '@/lib/money';
+import { usePeriod } from '@/state/period';
 import { cn } from '@/lib/utils';
 import type { WalletScope } from '@/data/types';
 
 export function TransactionsPage() {
   const qc = useQueryClient();
-  const [periodId, setPeriodId] = useState<string>('');
+  const { ref } = usePeriod();
+  const [allMonths, setAllMonths] = useState(false);
   const [reveal, setReveal] = useState(false);
   const [adding, setAdding] = useState(false);
   const [aiProgress, setAiProgress] = useState<ClassifyProgress | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const { data: period } = useQuery({
+    queryKey: ['period', ref.year, ref.month],
+    queryFn: () => findPeriod(ref),
+  });
+
+  // Empty string means every period; a missing month would otherwise show the whole ledger.
+  const periodId = allMonths ? '' : (period?.id ?? '__none__');
+
   const { data } = useQuery({
     queryKey: ['ledger', periodId, reveal],
     queryFn: async () => {
-      const [rows, categories, people, periods, unresolved] = await Promise.all([
+      const [rows, categories, people, unresolved] = await Promise.all([
         listTransactions({ periodId: periodId || null, reveal }),
         listCategories(),
         listPeople(),
-        listPeriods(),
         countUnresolved({ periodId: periodId || null }),
       ]);
-      return { rows, categories, people, periods, unresolved };
+      return { rows, categories, people, unresolved };
     },
   });
 
@@ -101,19 +110,19 @@ export function TransactionsPage() {
   });
 
   if (!data) return null;
-  const { rows, categories, people, periods, unresolved } = data;
+  const { rows, categories, people, unresolved } = data;
   const personOf = (id: string | null) => people.find((p) => p.id === id)?.name ?? '';
 
   return (
     <>
       <PageHeader
-        title="Transactions"
-        description="Every movement through the bank, grouped by the period it was debited."
+        title="תנועות"
+        description="כל תנועה בחשבון הבנק, מקובצת לפי החודש שבו חויבה."
         action={
           <div className="flex shrink-0 items-center gap-2">
             <Button size="sm" variant="ghost" onClick={() => setReveal((r) => !r)}>
               {reveal ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-              {reveal ? 'Hide personal' : 'Reveal personal'}
+              {reveal ? 'הסתר הוצאות אישיות' : 'הצג הוצאות אישיות'}
             </Button>
             <Button
               size="sm"
@@ -122,7 +131,7 @@ export function TransactionsPage() {
               disabled={recategorize.isPending}
             >
               <RefreshCw className={cn('size-3.5', recategorize.isPending && 'animate-spin')} />
-              Re-run rules
+              הרץ כללים מחדש
             </Button>
             <Button
               size="sm"
@@ -131,55 +140,64 @@ export function TransactionsPage() {
               disabled={askAi.isPending || unresolved === 0}
             >
               <Sparkles className="size-3.5" />
-              {unresolved === 0 ? 'Nothing to ask' : `Ask AI (${unresolved})`}
+              {unresolved === 0 ? 'אין מה לשאול' : `שאל AI (${unresolved})`}
             </Button>
             <Button size="sm" onClick={() => setAdding(true)}>
-              <Plus className="size-3.5" /> Add
+              <Plus className="size-3.5" /> הוספה
             </Button>
           </div>
         }
       />
 
       <div className="mb-4 flex items-center gap-3">
-        <Select
-          className="max-w-52"
-          value={periodId}
-          onChange={(e) => setPeriodId(e.target.value)}
-        >
-          <option value="">All periods</option>
-          {periods.map((p) => (
-            <option key={p.id} value={p.id}>
-              {periodLabel(p.year, p.month)}
-            </option>
-          ))}
-        </Select>
+        <div className="border-line inline-flex rounded-lg border p-0.5">
+          <button
+            type="button"
+            onClick={() => setAllMonths(false)}
+            className={cn(
+              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+              allMonths ? 'text-fg-muted hover:text-fg' : 'bg-surface-2 text-fg',
+            )}
+          >
+            {periodLabel(ref.year, ref.month)}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAllMonths(true)}
+            className={cn(
+              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+              allMonths ? 'bg-surface-2 text-fg' : 'text-fg-muted hover:text-fg',
+            )}
+          >
+            כל החודשים
+          </button>
+        </div>
         {recategorize.data && (
           <span className="text-fg-subtle text-xs">
-            Matched {recategorize.data.matched} of {recategorize.data.scanned}; {recategorize.data.unresolved}{' '}
-            still need a category.
+            הותאמו {recategorize.data.matched} מתוך {recategorize.data.scanned}; ל־{recategorize.data.unresolved}{' '}
+            עדיין חסרה קטגוריה.
           </span>
         )}
         {askAi.isPending && (
           <span className="text-fg-subtle flex items-center gap-2 text-xs">
             <Sparkles className="text-brand size-3.5 animate-pulse" />
             {aiProgress && aiProgress.total > 0
-              ? `Asking the model — ${aiProgress.done} of ${aiProgress.total} merchants`
-              : 'Waking the model…'}
+              ? `שואל את המודל — ${aiProgress.done} מתוך ${aiProgress.total} בתי עסק`
+              : 'מעיר את המודל…'}
             <button
               type="button"
               className="text-fg-muted hover:text-fg inline-flex items-center gap-1"
               onClick={() => abortRef.current?.abort()}
             >
-              <X className="size-3" /> Cancel
+              <X className="size-3" /> ביטול
             </button>
           </span>
         )}
         {!askAi.isPending && askAi.data && (
           <span className="text-fg-subtle text-xs">
-            AI read {askAi.data.uniqueMerchants} unique merchant
-            {askAi.data.uniqueMerchants === 1 ? '' : 's'} and filled {askAi.data.transactionsUpdated}{' '}
-            transaction{askAi.data.transactionsUpdated === 1 ? '' : 's'}
-            {askAi.data.lowConfidence > 0 ? `; ${askAi.data.lowConfidence} low-confidence` : ''}.
+            ה־ AI קרא {askAi.data.uniqueMerchants} בתי עסק ייחודיים ומילא{' '}
+            {askAi.data.transactionsUpdated} תנועות
+            {askAi.data.lowConfidence > 0 ? `; ${askAi.data.lowConfidence} בביטחון נמוך` : ''}.
           </span>
         )}
         {aiError && <span className="text-negative text-xs">{aiError}</span>}
@@ -201,19 +219,19 @@ export function TransactionsPage() {
       <Card>
         {rows.length === 0 ? (
           <EmptyState
-            title="No transactions yet"
-            description="Import a card statement, or add a manual entry for rent and other bank movements."
+            title="אין עדיין תנועות"
+            description="ייבא דף חיוב, או הוסף רשומה ידנית לשכר דירה ולתנועות בנק אחרות."
           />
         ) : (
           <CardBody className="overflow-x-auto p-0">
             <table className="w-full min-w-[42rem] text-xs">
               <thead className="bg-surface-2 text-fg-subtle">
-                <tr className="text-left">
-                  <th className="w-24 px-3 py-2.5 font-medium">Date</th>
-                  <th className="px-3 py-2.5 font-medium">Merchant</th>
-                  <th className="w-40 px-2 py-2.5 font-medium">Category</th>
-                  <th className="w-24 px-2 py-2.5 font-medium">Wallet</th>
-                  <th className="w-24 px-3 py-2.5 text-right font-medium">Amount</th>
+                <tr className="text-start">
+                  <th className="w-24 px-3 py-2.5 font-medium">תאריך</th>
+                  <th className="px-3 py-2.5 font-medium">בית עסק</th>
+                  <th className="w-40 px-2 py-2.5 font-medium">קטגוריה</th>
+                  <th className="w-24 px-2 py-2.5 font-medium">ארנק</th>
+                  <th className="w-24 px-3 py-2.5 text-end font-medium">סכום</th>
                   <th className="w-9" />
                 </tr>
               </thead>
@@ -234,7 +252,7 @@ export function TransactionsPage() {
                       </div>
                       {row.installment_total ? (
                         <span className="text-fg-subtle text-[10px]">
-                          Payment {row.installment_current}/{row.installment_total}
+                          תשלום {row.installment_current}/{row.installment_total}
                         </span>
                       ) : null}
                     </td>
@@ -252,7 +270,7 @@ export function TransactionsPage() {
                           })
                         }
                       >
-                        <option value="">Uncategorized</option>
+                        <option value="">ללא קטגוריה</option>
                         {categories.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name}
@@ -276,7 +294,7 @@ export function TransactionsPage() {
                           });
                         }}
                       >
-                        <option value="joint">Joint</option>
+                        <option value="joint">משותף</option>
                         {people.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
@@ -286,7 +304,7 @@ export function TransactionsPage() {
                     </td>
                     <td
                       className={cn(
-                        'tnum px-3 py-2 text-right whitespace-nowrap',
+                        'tnum px-3 py-2 text-end whitespace-nowrap',
                         row.direction === 'in' && 'text-positive',
                       )}
                     >
@@ -294,11 +312,11 @@ export function TransactionsPage() {
                         precise: true,
                       })}
                     </td>
-                    <td className="pr-3">
+                    <td className="pe-3">
                       {row.entry_mode === 'manual' && (
                         <button
                           type="button"
-                          aria-label={`Delete ${row.description}`}
+                          aria-label={`מחיקת ${row.description}`}
                           className="text-fg-subtle hover:text-negative"
                           onClick={() => remove.mutate(row.id)}
                         >
@@ -317,11 +335,11 @@ export function TransactionsPage() {
       {rows.some((r) => r.is_masked === 1) && !reveal && (
         <p className="text-fg-subtle mt-3 flex items-center gap-1.5 text-xs">
           <Lock className="size-3" />
-          Personal vendor names are hidden. Amounts still count against{' '}
+          שמות בתי העסק האישיים מוסתרים. הסכומים עדיין נזקפים לארנק של{' '}
           {[...new Set(rows.filter((r) => r.is_masked === 1).map((r) => personOf(r.personal_person_id)))]
             .filter(Boolean)
-            .join(' and ') || 'their owner'}
-          &rsquo;s wallet.
+            .join(' ו') || 'הבעלים'}
+          .
         </p>
       )}
     </>

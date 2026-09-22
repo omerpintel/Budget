@@ -8,10 +8,10 @@ import { archiveCategory, createCategory, listCategories } from '@/data/categori
 import type { CategoryKind } from '@/data/types';
 
 const KINDS: Array<{ value: CategoryKind; label: string; hint: string }> = [
-  { value: 'income', label: 'Income', hint: 'Salaries, refunds' },
-  { value: 'fixed', label: 'Fixed', hint: 'Same every month' },
-  { value: 'flexible', label: 'Flexible', hint: 'Varies — this is what the joint buffer absorbs' },
-  { value: 'savings', label: 'Savings', hint: 'Contributions to the savings buffer' },
+  { value: 'income', label: 'הכנסה', hint: 'משכורות, החזרים' },
+  { value: 'fixed', label: 'קבוע', hint: 'אותו דבר כל חודש' },
+  { value: 'flexible', label: 'משתנה', hint: 'משתנה מחודש לחודש — זה מה שהכרית המשותפת סופגת' },
+  { value: 'savings', label: 'חיסכון', hint: 'הפרשות לכרית החיסכון' },
 ];
 
 function slugify(name: string): string {
@@ -54,22 +54,22 @@ export function CategoriesCard() {
   return (
     <Card>
       <CardHeader
-        title="Categories"
-        description="Flexible categories are the ones measured against the joint plan. Built-in categories cannot be removed."
+        title="קטגוריות"
+        description="הקטגוריות המשתנות הן אלה שנמדדות מול התכנית המשותפת. אי אפשר להסיר קטגוריות מובנות."
       />
       <CardBody className="space-y-4">
         <div className="flex items-end gap-3">
-          <Field label="New category" className="flex-1">
+          <Field label="קטגוריה חדשה" className="flex-1">
             <Input
               value={name}
-              placeholder="Dry cleaning"
+              placeholder="מכבסה"
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && name.trim()) add.mutate();
               }}
             />
           </Field>
-          <Field label="Kind" className="w-44">
+          <Field label="סוג" className="w-44">
             <Select value={kind} onChange={(e) => setKind(e.target.value as CategoryKind)}>
               {KINDS.map((k) => (
                 <option key={k.value} value={k.value}>
@@ -79,7 +79,7 @@ export function CategoriesCard() {
             </Select>
           </Field>
           <Button size="md" disabled={!name.trim()} onClick={() => add.mutate()}>
-            <Plus className="size-4" /> Add
+            <Plus className="size-4" /> הוספה
           </Button>
         </div>
 
@@ -101,7 +101,7 @@ export function CategoriesCard() {
                     {c.is_system === 0 && (
                       <button
                         type="button"
-                        aria-label={`Remove ${c.name}`}
+                        aria-label={`הסרת ${c.name}`}
                         className="text-fg-subtle hover:text-negative"
                         onClick={() => archive.mutate(c.id)}
                       >

@@ -45,27 +45,31 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
   function Select({ className, children, ...props }, ref) {
     return (
-      <select ref={ref} className={cn(fieldBase, 'cursor-pointer pr-8', className)} {...props}>
+      <select ref={ref} className={cn(fieldBase, 'cursor-pointer pe-8', className)} {...props}>
         {children}
       </select>
     );
   },
 );
 
-/** Money input: right-aligned, tabular, with a fixed ₪ affix. */
+/**
+ * Money input: the ₪ sits on the right and digits run left-to-right, so the
+ * padding is physical — `.tnum` forces the field itself to LTR, which would
+ * otherwise flip logical padding away from the affix.
+ */
 export const MoneyInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function MoneyInput({ className, ...props }, ref) {
     const id = useId();
     return (
       <div className="relative">
-        <span className="text-fg-subtle pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm">
+        <span className="text-fg-subtle pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm">
           ₪
         </span>
         <input
           ref={ref}
           id={props.id ?? id}
           inputMode="decimal"
-          className={cn(fieldBase, 'tnum pr-3 pl-7 text-right', className)}
+          className={cn(fieldBase, 'tnum pr-7 pl-3 text-right', className)}
           {...props}
         />
       </div>

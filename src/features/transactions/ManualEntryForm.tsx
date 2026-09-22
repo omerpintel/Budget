@@ -49,29 +49,29 @@ export function ManualEntryForm({
   return (
     <Card>
       <CardHeader
-        title="Add a transaction"
-        description="For anything that never reaches a card statement — rent wires, cash, standing orders, salary."
+        title="הוספת תנועה"
+        description="לכל מה שלא מגיע לדף חיוב — העברות שכר דירה, מזומן, הוראות קבע ומשכורות."
       />
       <CardBody className="space-y-3">
         <div className="grid grid-cols-4 gap-3">
-          <Field label="Date">
+          <Field label="תאריך">
             <Input type="date" value={draft.date} onChange={(e) => set('date', e.target.value)} />
           </Field>
-          <Field label="Direction">
+          <Field label="כיוון">
             <Select
               value={draft.direction}
               onChange={(e) => set('direction', e.target.value as Direction)}
             >
-              <option value="out">Money out</option>
-              <option value="in">Money in</option>
+              <option value="out">כסף שיצא</option>
+              <option value="in">כסף שנכנס</option>
             </Select>
           </Field>
-          <Field label="Amount">
+          <Field label="סכום">
             <MoneyInput value={draft.amountRaw} onChange={(e) => set('amountRaw', e.target.value)} />
           </Field>
-          <Field label="Category">
+          <Field label="קטגוריה">
             <Select value={draft.categoryId} onChange={(e) => set('categoryId', e.target.value)}>
-              <option value="">— none —</option>
+              <option value="">— ללא —</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -82,23 +82,23 @@ export function ManualEntryForm({
         </div>
 
         <div className="grid grid-cols-4 gap-3">
-          <Field label="Description" className="col-span-2">
+          <Field label="תיאור" className="col-span-2">
             <Input
               value={draft.description}
-              placeholder="Rent transfer"
+              placeholder="העברת שכר דירה"
               onChange={(e) => set('description', e.target.value)}
             />
           </Field>
-          <Field label="Wallet">
+          <Field label="ארנק">
             <Select
               value={draft.wallet}
               onChange={(e) => set('wallet', e.target.value as WalletScope)}
             >
-              <option value="joint">Joint</option>
-              <option value="personal">Personal</option>
+              <option value="joint">משותף</option>
+              <option value="personal">אישי</option>
             </Select>
           </Field>
-          <Field label="Whose" hint={draft.wallet === 'joint' ? 'Joint expenses have no owner' : undefined}>
+          <Field label="של מי" hint={draft.wallet === 'joint' ? 'להוצאה משותפת אין בעלים' : undefined}>
             <Select
               value={draft.personId}
               disabled={draft.wallet === 'joint'}
@@ -115,7 +115,7 @@ export function ManualEntryForm({
 
         <div className="flex items-center justify-end gap-2 pt-1">
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
-            Cancel
+            ביטול
           </Button>
           <Button
             size="sm"
@@ -129,7 +129,7 @@ export function ManualEntryForm({
               }
             }}
           >
-            {saving ? 'Adding…' : 'Add transaction'}
+            {saving ? 'מוסיף…' : 'הוספת תנועה'}
           </Button>
         </div>
       </CardBody>

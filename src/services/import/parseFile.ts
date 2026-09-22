@@ -96,7 +96,7 @@ export function parseGrid(
     // Totals labels sit in the first column, not the description column.
     const firstCell = text.find((c) => c !== '') ?? '';
     if (adapter.skipRowPatterns?.some((re) => re.test(firstCell) || re.test(description))) {
-      skipped.push({ rowIndex: i, reason: 'Summary row', preview: firstCell });
+      skipped.push({ rowIndex: i, reason: 'שורת סיכום', preview: firstCell });
       continue;
     }
     if (description === '') {
@@ -105,13 +105,13 @@ export function parseGrid(
 
     const transactionDate = parseDate(raw[columnMap.transactionDate!]);
     if (!transactionDate) {
-      skipped.push({ rowIndex: i, reason: 'Unreadable date', preview: description });
+      skipped.push({ rowIndex: i, reason: 'תאריך לא קריא', preview: description });
       continue;
     }
 
     const signed = extractAmount(raw, columnMap, adapter.amountSign);
     if (signed === null || signed === 0) {
-      skipped.push({ rowIndex: i, reason: 'No amount', preview: description });
+      skipped.push({ rowIndex: i, reason: 'אין סכום', preview: description });
       continue;
     }
 

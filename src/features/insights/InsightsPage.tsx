@@ -1,8 +1,8 @@
-import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowRight,
   CalendarClock,
   CreditCard,
   EyeOff,
@@ -14,26 +14,41 @@ import {
 } from 'lucide-react';
 import { PageHeader, EmptyState } from '@/components/ui/Feedback';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-import { Select } from '@/components/ui/Field';
 import { MerchantText } from '@/components/MerchantText';
-import { listPeriods } from '@/data/periods';
+import { findPeriod } from '@/data/periods';
 import { buildInsights, getDismissedSubscriptions, setSubscriptionDismissed } from '@/data/insights';
 import { formatAgorot, periodLabel } from '@/lib/money';
+import { usePeriod } from '@/state/period';
 import { cn } from '@/lib/utils';
 import type { Anomaly } from '@/services/insights/anomalies';
 
 const CADENCE_LABEL: Record<string, string> = {
-  monthly: 'Monthly',
-  bimonthly: 'Every two months',
-  quarterly: 'Quarterly',
-  annual: 'Yearly',
+  monthly: 'חודשי',
+  bimonthly: 'דו-חודשי',
+  quarterly: 'רבעוני',
+  annual: 'שנתי',
 };
 
+function BackLink() {
+  return (
+    <Link
+      to="/"
+      className="text-fg-subtle hover:text-fg mb-2 inline-flex items-center gap-1 text-xs"
+    >
+      <ArrowRight className="dir-icon size-3.5" />
+      חזרה למרכז
+    </Link>
+  );
+}
+
 export function InsightsPage() {
-  const [periodId, setPeriodId] = useState('');
   const qc = useQueryClient();
-  const { data: periods } = useQuery({ queryKey: ['periods'], queryFn: listPeriods });
-  const active = periodId || periods?.[0]?.id || '';
+  const { ref } = usePeriod();
+  const { data: period, isFetched } = useQuery({
+    queryKey: ['period', ref.year, ref.month],
+    queryFn: () => findPeriod(ref),
+  });
+  const active = period?.id ?? '';
 
   const { data } = useQuery({
     enabled: Boolean(active),
@@ -47,15 +62,15 @@ export function InsightsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['insights'] }),
   });
 
-  if (!periods) return null;
-  if (periods.length === 0) {
+  if (isFetched && !period) {
     return (
       <>
-        <PageHeader title="Insights" />
+        <BackLink />
+        <PageHeader title="תובנות" />
         <Card>
           <EmptyState
-            title="Nothing to analyse yet"
-            description="Import a few months of statements and patterns start showing up here."
+            title={`אין מה לנתח ב${periodLabel(ref.year, ref.month)}`}
+            description="ייבא כמה חודשים של דפי חיוב והדפוסים יתחילו להופיע כאן."
           />
         </Card>
       </>
@@ -68,36 +83,24 @@ export function InsightsPage() {
 
   return (
     <>
+      <BackLink />
       <PageHeader
-        title="Insights"
-        description="Patterns the app noticed on its own. Nothing here changes your numbers."
-        action={
-          <Select
-            className="h-8 w-40 shrink-0 text-xs"
-            value={active}
-            onChange={(e) => setPeriodId(e.target.value)}
-          >
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {periodLabel(p.year, p.month)}
-              </option>
-            ))}
-          </Select>
-        }
+        title="תובנות"
+        description="דפוסים שהאפליקציה זיהתה בעצמה. שום דבר כאן לא משנה את המספרים שלך."
       />
 
       <div className="space-y-4">
         <Card>
           <CardHeader
-            title="Recurring charges"
-            description="Detected from billing rhythm and price stability — no list to maintain."
+            title="חיובים קבועים"
+            description="מזוהים לפי קצב החיוב ויציבות המחיר — אין רשימה לתחזק."
             action={
               activeSubs.length > 0 ? (
-                <div className="text-right">
+                <div className="text-end">
                   <div className="tnum text-sm font-semibold">
                     {formatAgorot(data.annualSubscriptionCost)}
                   </div>
-                  <div className="text-fg-subtle text-[11px]">per year</div>
+                  <div className="text-fg-subtle text-[11px]">בשנה</div>
                 </div>
               ) : undefined
             }
@@ -105,18 +108,17 @@ export function InsightsPage() {
           <CardBody className={activeSubs.length === 0 ? undefined : 'p-0'}>
             {data.subscriptions.length === 0 ? (
               <p className="text-fg-subtle text-xs">
-                Nothing recurring found yet. A charge needs to appear at least three times at a steady
-                price before it counts.
+                עדיין לא נמצא שום חיוב קבוע. חיוב צריך להופיע לפחות שלוש פעמים במחיר יציב כדי להיחשב.
               </p>
             ) : (
               <table className="w-full text-xs">
                 <thead className="bg-surface-2 text-fg-subtle">
-                  <tr className="text-left">
-                    <th className="px-4 py-2 font-medium">Merchant</th>
-                    <th className="w-36 px-4 py-2 font-medium">Rhythm</th>
-                    <th className="w-28 px-4 py-2 font-medium">Next</th>
-                    <th className="w-24 px-4 py-2 text-right font-medium">Each</th>
-                    <th className="w-24 px-4 py-2 text-right font-medium">Paid</th>
+                  <tr className="text-start">
+                    <th className="px-4 py-2 font-medium">בית עסק</th>
+                    <th className="w-36 px-4 py-2 font-medium">תדירות</th>
+                    <th className="w-28 px-4 py-2 font-medium">הבא</th>
+                    <th className="w-24 px-4 py-2 text-end font-medium">כל חיוב</th>
+                    <th className="w-24 px-4 py-2 text-end font-medium">שולם</th>
                     <th className="w-9" />
                   </tr>
                 </thead>
@@ -141,23 +143,23 @@ export function InsightsPage() {
                       </td>
                       <td className="text-fg-muted px-4 py-2">
                         {CADENCE_LABEL[sub.cadence]}
-                        {sub.status === 'cancelled' && ' · stopped'}
-                        {sub.status === 'watch' && ' · overdue'}
+                        {sub.status === 'cancelled' && ' · הופסק'}
+                        {sub.status === 'watch' && ' · באיחור'}
                       </td>
                       <td className="text-fg-muted px-4 py-2">
                         {sub.status === 'cancelled' ? '—' : sub.nextExpected}
                       </td>
-                      <td className="tnum px-4 py-2 text-right">
+                      <td className="tnum px-4 py-2 text-end">
                         {formatAgorot(sub.expectedAmount)}
                       </td>
-                      <td className="tnum text-fg-muted px-4 py-2 text-right">
+                      <td className="tnum text-fg-muted px-4 py-2 text-end">
                         {formatAgorot(sub.totalPaid)}
                       </td>
-                      <td className="pr-3 text-right">
+                      <td className="pe-3 text-end">
                         <button
                           type="button"
-                          aria-label={`Not a subscription: ${sub.merchant}`}
-                          title="Not a subscription"
+                          aria-label={`לא מנוי: ${sub.merchant}`}
+                          title="לא מנוי"
                           className="text-fg-subtle hover:text-fg"
                           onClick={() => dismiss.mutate({ merchant: sub.merchant, hidden: true })}
                         >
@@ -182,7 +184,8 @@ export function InsightsPage() {
                   }}
                 >
                   <RotateCcw className="size-3" />
-                  {data.dismissedCount} hidden — bring back
+                  {data.dismissedCount === 1 ? 'חיוב אחד מוסתר' : `${data.dismissedCount} חיובים מוסתרים`} —
+                  החזרה
                 </button>
               </div>
             )}
@@ -191,21 +194,21 @@ export function InsightsPage() {
 
         <Card>
           <CardHeader
-            title="What changed this month"
-            description="Flexible categories compared with their own recent average."
+            title="מה השתנה החודש"
+            description="קטגוריות משתנות בהשוואה לממוצע האחרון שלהן."
           />
           <CardBody className="space-y-2">
             {data.historyDepth < 2 ? (
               <p className="text-fg-subtle text-xs">
-                Two earlier months are needed before averages mean anything. Use{' '}
+                צריך לפחות שני חודשים קודמים כדי שלממוצעים תהיה משמעות. השתמש ב־{' '}
                 <Link to="/import" className="text-brand underline">
-                  historical backfill
+                  מילוי היסטוריה
                 </Link>{' '}
-                to load older statements and this fills in immediately.
+                כדי לטעון דפי חיוב ישנים וזה יתמלא מיד.
               </p>
             ) : data.anomalies.length === 0 ? (
               <p className="text-fg-subtle text-xs">
-                Nothing unusual — every category is close to its average.
+                אין חריגות — כל קטגוריה קרובה לממוצע שלה.
               </p>
             ) : (
               data.anomalies.map((anomaly) => <AnomalyRow key={anomaly.categoryId} anomaly={anomaly} />)
@@ -215,46 +218,46 @@ export function InsightsPage() {
 
         <Card>
           <CardHeader
-            title="Committed instalments"
-            description="Only this month's payment hits the budget, so here is what is still owed."
+            title="תשלומים שנותרו"
+            description="רק התשלום של החודש נכנס לתקציב, אז הנה מה שעוד חייבים."
             action={
               data.installments.length > 0 ? (
-                <div className="text-right">
+                <div className="text-end">
                   <div className="tnum text-sm font-semibold">
                     {formatAgorot(data.installmentOutstanding)}
                   </div>
-                  <div className="text-fg-subtle text-[11px]">still to pay</div>
+                  <div className="text-fg-subtle text-[11px]">נותר לשלם</div>
                 </div>
               ) : undefined
             }
           />
           <CardBody className={data.installments.length === 0 ? undefined : 'p-0'}>
             {data.installments.length === 0 ? (
-              <p className="text-fg-subtle text-xs">No instalment plans running.</p>
+              <p className="text-fg-subtle text-xs">אין תוכניות תשלומים פעילות.</p>
             ) : (
               <table className="w-full text-xs">
                 <tbody>
                   {data.installments.map((plan) => (
                     <tr key={`${plan.merchant}-${plan.total}`} className="border-line/60 border-t">
-                      <td className="w-8 pl-4">
+                      <td className="w-8 ps-4">
                         <CreditCard className="text-fg-subtle size-3.5" />
                       </td>
                       <td className="px-2 py-2">
                         <MerchantText value={plan.merchant} />
                       </td>
                       <td className="text-fg-muted px-4 py-2">
-                        {plan.paid} of {plan.total} paid
+                        שולמו {plan.paid} מתוך {plan.total}
                       </td>
                       <td className="text-fg-muted px-4 py-2">
                         <span className="flex items-center gap-1.5">
                           <CalendarClock className="size-3" />
-                          ends {plan.finalPayment}
+                          מסתיים {plan.finalPayment}
                         </span>
                       </td>
-                      <td className="tnum text-fg-muted px-4 py-2 text-right">
-                        {formatAgorot(plan.monthlyAmount)}/mo
+                      <td className="tnum text-fg-muted px-4 py-2 text-end">
+                        {formatAgorot(plan.monthlyAmount)}/חודש
                       </td>
-                      <td className="tnum px-4 py-2 pr-4 text-right font-medium">
+                      <td className="tnum px-4 py-2 pe-4 text-end font-medium">
                         {formatAgorot(plan.outstanding)}
                       </td>
                     </tr>
@@ -276,13 +279,13 @@ function AnomalyRow({ anomaly }: { anomaly: Anomaly }) {
   const sentence = () => {
     switch (anomaly.kind) {
       case 'new':
-        return `New this month — ${formatAgorot(anomaly.current)} with no history to compare against.`;
+        return `חדש החודש — ${formatAgorot(anomaly.current)}, אין היסטוריה להשוואה.`;
       case 'stopped':
-        return `Nothing spent, against an average of ${formatAgorot(anomaly.average)}.`;
+        return `לא הוצא כלום, מול ממוצע של ${formatAgorot(anomaly.average)}.`;
       default:
-        return `${formatAgorot(anomaly.current)} against an average of ${formatAgorot(
+        return `${formatAgorot(anomaly.current)} מול ממוצע של ${formatAgorot(
           anomaly.average,
-        )} — ${Math.abs(Math.round(anomaly.deviation * 100))}% ${up ? 'more' : 'less'}.`;
+        )} — ${Math.abs(Math.round(anomaly.deviation * 100))}% ${up ? 'יותר' : 'פחות'}.`;
     }
   };
 

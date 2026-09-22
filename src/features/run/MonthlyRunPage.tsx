@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
+  CalendarPlus,
   Check,
   CircleCheck,
   Copy,
-  FileText,
   Lock,
   Plus,
   Trash2,
 } from 'lucide-react';
-import { PageHeader } from '@/components/ui/Feedback';
+import { PageHeader, EmptyState } from '@/components/ui/Feedback';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, MoneyInput, Select } from '@/components/ui/Field';
@@ -20,13 +20,14 @@ import { Stepper } from '@/components/ui/Stepper';
 import { WalletCard } from '@/components/WalletCard';
 import { MerchantText } from '@/components/MerchantText';
 import { ImportPage } from '@/features/import/ImportPage';
+import { ImportHistory } from '@/features/import/ImportHistory';
 import { TriagePage } from '@/features/triage/TriagePage';
 import { ShortfallDialog } from '@/features/budget/ShortfallDialog';
-import { ensurePeriod } from '@/data/periods';
+import { ensurePeriod, findPeriod } from '@/data/periods';
+import { listImportHistory } from '@/data/imports';
 import {
   deriveStep,
   getRunStatus,
-  listImportBatches,
   listManualOutflows,
   materializeRecurring,
   RUN_STEPS,
@@ -46,18 +47,24 @@ import { listCategories, listRecurringEntries } from '@/data/categories';
 import { deleteTransaction, createManualTransaction } from '@/data/transactions';
 import { ensureManualAccount } from '@/data/accounts';
 import { formatAgorot, parseMoneyInput, periodLabel, toMajor } from '@/lib/money';
+import { usePeriod } from '@/state/period';
 import { cn } from '@/lib/utils';
 
 export function MonthlyRunPage() {
   const qc = useQueryClient();
   // Null means "follow the data"; once the user navigates we respect their choice.
   const [manualStep, setManualStep] = useState<number | null>(null);
-  const now = new Date();
-  const ref = { year: now.getFullYear(), month: now.getMonth() + 1 };
+  const { ref, isCurrent } = usePeriod();
 
-  const { data: period } = useQuery({
+  // Browsing to a month must not create it; only the current month starts on its own.
+  const { data: period, isFetched } = useQuery({
     queryKey: ['run-period', ref.year, ref.month],
-    queryFn: () => ensurePeriod(ref),
+    queryFn: () => (isCurrent ? ensurePeriod(ref) : findPeriod(ref)),
+  });
+
+  const start = useMutation({
+    mutationFn: () => ensurePeriod(ref),
+    onSuccess: () => qc.invalidateQueries(),
   });
 
   const { data: status } = useQuery({
@@ -70,6 +77,29 @@ export function MonthlyRunPage() {
     setManualStep(null);
   }, [period?.id]);
 
+  if (isFetched && !period) {
+    return (
+      <>
+        <PageHeader
+          title={`סגירת חודש ${periodLabel(ref.year, ref.month)}`}
+          description="עדיין לא נרשם כלום לחודש הזה."
+        />
+        <Card>
+          <EmptyState
+            icon={<CalendarPlus className="size-8" strokeWidth={1.25} />}
+            title="החודש הזה עדיין לא נפתח"
+            description="פתיחתו תיצור את החודש, כך שתוכל להזין משכורות ולייבא דפי חיוב."
+            action={
+              <Button disabled={start.isPending} onClick={() => start.mutate()}>
+                {start.isPending ? 'פותח…' : `פתח את ${periodLabel(ref.year, ref.month)}`}
+              </Button>
+            }
+          />
+        </Card>
+      </>
+    );
+  }
+
   if (!period || !status) return null;
   const derived = deriveStep(status);
   const step = manualStep ?? derived;
@@ -79,12 +109,12 @@ export function MonthlyRunPage() {
   return (
     <>
       <PageHeader
-        title={`${periodLabel(period.year, period.month)} run`}
-        description="Everything that moves through the bank this month, in one sitting."
+        title={`סגירת חודש ${periodLabel(period.year, period.month)}`}
+        description="כל מה שעובר בחשבון הבנק החודש, בישיבה אחת."
         action={
           status.committed ? (
             <span className="text-positive flex items-center gap-1.5 text-xs font-medium">
-              <CircleCheck className="size-4" /> Committed
+              <CircleCheck className="size-4" /> נעול
             </span>
           ) : undefined
         }
@@ -110,11 +140,11 @@ export function MonthlyRunPage() {
           onClick={() => setManualStep(Math.max(step - 1, 0))}
           disabled={step === 0}
         >
-          <ArrowLeft className="size-4" /> Back
+          <ArrowLeft className="dir-icon size-4" /> חזרה
         </Button>
         {step < RUN_STEPS.length - 1 && (
           <Button onClick={() => setManualStep(Math.min(step + 1, RUN_STEPS.length - 1))}>
-            Continue <ArrowRight className="size-4" />
+            המשך <ArrowRight className="dir-icon size-4" />
           </Button>
         )}
       </div>
@@ -131,7 +161,7 @@ function BankStep({
   periodRef: { year: number; month: number };
   onChanged: () => void;
 }) {
-  const [label, setLabel] = useState('Salary');
+  const [label, setLabel] = useState('משכורת');
   const [personId, setPersonId] = useState('');
   const [amountRaw, setAmountRaw] = useState('');
   const [expense, setExpense] = useState({ name: '', amount: '', categoryId: '' });
@@ -159,8 +189,8 @@ function BankStep({
     <div className="space-y-4">
       <Card>
         <CardHeader
-          title="Money in"
-          description="Salaries vary month to month, so confirm what actually landed."
+          title="כסף שנכנס"
+          description="המשכורות משתנות מחודש לחודש, אז אשר מה שבאמת נכנס."
           action={
             <div className="flex items-center gap-2">
               {templates.length > 0 && (
@@ -172,7 +202,7 @@ function BankStep({
                     onChanged();
                   }}
                 >
-                  <Copy className="size-3.5" /> Fill from templates
+                  <Copy className="size-3.5" /> מלא מהתבניות
                 </Button>
               )}
               <span className="tnum text-sm font-semibold">{formatAgorot(incomeTotal)}</span>
@@ -182,7 +212,7 @@ function BankStep({
         <CardBody className="space-y-3">
           {incomes.length === 0 ? (
             <p className="text-fg-subtle text-xs">
-              Nothing yet. Add both salaries, or set up templates in Settings so this fills itself.
+              עדיין ריק. הוסף את שתי המשכורות, או הגדר תבניות בהגדרות כדי שזה יימלא לבד.
             </p>
           ) : (
             <table className="w-full text-xs">
@@ -193,7 +223,7 @@ function BankStep({
                     <td className="text-fg-muted py-2">
                       {income.person_id
                         ? people.find((p) => p.id === income.person_id)?.name
-                        : 'Household'}
+                        : 'משק הבית'}
                     </td>
                     <td className="w-32 py-2">
                       <MoneyInput
@@ -209,10 +239,10 @@ function BankStep({
                         }}
                       />
                     </td>
-                    <td className="w-8 text-right">
+                    <td className="w-8 text-end">
                       <button
                         type="button"
-                        aria-label={`Remove ${income.label}`}
+                        aria-label={`הסרת ${income.label}`}
                         className="text-fg-subtle hover:text-negative"
                         onClick={async () => {
                           await removeIncome(income.id);
@@ -229,12 +259,12 @@ function BankStep({
           )}
 
           <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-3">
-            <Field label="Label">
+            <Field label="תיאור">
               <Input value={label} onChange={(e) => setLabel(e.target.value)} />
             </Field>
-            <Field label="Whose">
+            <Field label="של מי">
               <Select value={personId} onChange={(e) => setPersonId(e.target.value)}>
-                <option value="">Household</option>
+                <option value="">משק הבית</option>
                 {people.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -242,7 +272,7 @@ function BankStep({
                 ))}
               </Select>
             </Field>
-            <Field label="Amount">
+            <Field label="סכום">
               <MoneyInput value={amountRaw} onChange={(e) => setAmountRaw(e.target.value)} />
             </Field>
             <Button
@@ -258,7 +288,7 @@ function BankStep({
                 onChanged();
               }}
             >
-              <Plus className="size-4" /> Add
+              <Plus className="size-4" /> הוספה
             </Button>
           </div>
         </CardBody>
@@ -266,8 +296,8 @@ function BankStep({
 
       <Card>
         <CardHeader
-          title="Money out of the bank"
-          description="Rent wires, standing orders and cash — anything that never reaches a card statement."
+          title="כסף שיצא מהבנק"
+          description="העברות שכר דירה, הוראות קבע ומזומן — כל מה שלא מגיע לדף חיוב."
           action={<span className="tnum text-sm font-semibold">{formatAgorot(-outflowTotal)}</span>}
         />
         <CardBody className="space-y-3">
@@ -281,11 +311,11 @@ function BankStep({
                       <MerchantText value={row.raw_description} />
                     </td>
                     <td className="text-fg-muted py-2">{row.category_name}</td>
-                    <td className="tnum w-24 py-2 text-right">{formatAgorot(-row.amount)}</td>
-                    <td className="w-8 text-right">
+                    <td className="tnum w-24 py-2 text-end">{formatAgorot(-row.amount)}</td>
+                    <td className="w-8 text-end">
                       <button
                         type="button"
-                        aria-label={`Remove ${row.raw_description}`}
+                        aria-label={`הסרת ${row.raw_description}`}
                         className="text-fg-subtle hover:text-negative"
                         onClick={async () => {
                           await deleteTransaction(row.id);
@@ -302,19 +332,19 @@ function BankStep({
           )}
 
           <div className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-3">
-            <Field label="What">
+            <Field label="מה">
               <Input
                 value={expense.name}
-                placeholder="Rent"
+                placeholder="שכר דירה"
                 onChange={(e) => setExpense({ ...expense, name: e.target.value })}
               />
             </Field>
-            <Field label="Category">
+            <Field label="קטגוריה">
               <Select
                 value={expense.categoryId}
                 onChange={(e) => setExpense({ ...expense, categoryId: e.target.value })}
               >
-                <option value="">— none —</option>
+                <option value="">— ללא —</option>
                 {categories
                   .filter((c) => ['fixed', 'flexible', 'savings'].includes(c.kind))
                   .map((c) => (
@@ -324,7 +354,7 @@ function BankStep({
                   ))}
               </Select>
             </Field>
-            <Field label="Amount">
+            <Field label="סכום">
               <MoneyInput
                 value={expense.amount}
                 onChange={(e) => setExpense({ ...expense, amount: e.target.value })}
@@ -350,7 +380,7 @@ function BankStep({
                 onChanged();
               }}
             >
-              <Plus className="size-4" /> Add
+              <Plus className="size-4" /> הוספה
             </Button>
           </div>
         </CardBody>
@@ -361,37 +391,26 @@ function BankStep({
 
 function ImportStep({ periodId }: { periodId: string }) {
   const { data: batches } = useQuery({
-    queryKey: ['run-batches', periodId],
-    queryFn: () => listImportBatches(periodId),
+    queryKey: ['import-history', periodId],
+    queryFn: () => listImportHistory(periodId),
   });
 
   return (
     <div className="space-y-4">
+      <ImportPage embedded />
       {batches && batches.length > 0 && (
         <Card>
           <CardHeader
-            title={`${batches.length} statement${batches.length === 1 ? '' : 's'} in this period`}
+            title={
+              batches.length === 1 ? 'דף חיוב אחד בחודש הזה' : `${batches.length} דפי חיוב בחודש הזה`
+            }
+            description="קובץ לא נכון? ביטול מחזיר את הכל למצב שלפני ההעלאה."
           />
-          <CardBody className="p-0">
-            <table className="w-full text-xs">
-              <tbody>
-                {batches.map((b) => (
-                  <tr key={b.id} className="border-line/60 border-t">
-                    <td className="w-8 pl-4">
-                      <FileText className="text-fg-subtle size-3.5" />
-                    </td>
-                    <td className="py-2 font-medium">{b.file_name}</td>
-                    <td className="text-fg-muted py-2">{b.account_name}</td>
-                    <td className="text-fg-muted py-2">debits {b.debit_date}</td>
-                    <td className="tnum text-fg-muted py-2 pr-4 text-right">{b.row_count} rows</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <CardBody>
+            <ImportHistory periodId={periodId} />
           </CardBody>
         </Card>
       )}
-      <ImportPage embedded />
     </div>
   );
 }
@@ -402,8 +421,8 @@ function TriageStep({ periodId, unreviewed }: { periodId: string; unreviewed: nu
       <Card>
         <CardBody className="space-y-2 py-10 text-center">
           <Check className="text-positive mx-auto size-7" strokeWidth={1.5} />
-          <p className="text-sm font-medium">Everything in this period is confirmed</p>
-          <p className="text-fg-muted text-xs">Continue to reconcile and commit the month.</p>
+          <p className="text-sm font-medium">כל מה שבחודש הזה אושר</p>
+          <p className="text-fg-muted text-xs">המשך להתאמה ולנעילת החודש.</p>
         </CardBody>
       </Card>
     );
@@ -440,7 +459,7 @@ function ReconcileStep({
   if (!data) return null;
   const { result, lines, actuals, wallets, people } = data;
   const jointWallet = wallets.find((w) => w.kind === 'joint_buffer');
-  const personName = (id: string | null) => people.find((p) => p.id === id)?.name ?? 'Unknown';
+  const personName = (id: string | null) => people.find((p) => p.id === id)?.name ?? 'לא ידוע';
   const balances = new Map(
     wallets.map((w) => {
       if (w.kind === 'joint_buffer') return [w.id, result.joint.closing];
@@ -455,16 +474,16 @@ function ReconcileStep({
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-3">
         <WalletCard
-          name="Joint"
+          name="משותף"
           kind="joint_buffer"
           balance={result.joint.closing}
-          caption={`${formatAgorot(result.joint.delta, { signed: true })} this month`}
+          caption={`${formatAgorot(result.joint.delta, { signed: true })} החודש`}
         />
         <WalletCard
-          name="Savings"
+          name="חיסכון"
           kind="savings"
           balance={result.savings.closing}
-          caption={`${formatAgorot(result.savings.delta, { signed: true })} this month`}
+          caption={`${formatAgorot(result.savings.delta, { signed: true })} החודש`}
         />
         {people.map((person, i) => (
           <WalletCard
@@ -475,7 +494,7 @@ function ReconcileStep({
             balance={result.personal[person.id]?.closing ?? 0}
             caption={`${formatAgorot(result.personal[person.id]?.delta ?? 0, {
               signed: true,
-            })} this month`}
+            })} החודש`}
           />
         ))}
       </div>
@@ -494,7 +513,7 @@ function ReconcileStep({
               fromWalletId,
               toWalletId: jointWallet.id,
               amount,
-              reason: 'Cover shortfall',
+              reason: 'כיסוי גירעון',
             });
             onChanged();
           }}
@@ -503,8 +522,8 @@ function ReconcileStep({
 
       <Card>
         <CardHeader
-          title="Planned against actual"
-          description="Flexible categories only — these are what the joint buffer absorbs."
+          title="מתוכנן מול בפועל"
+          description="קטגוריות משתנות בלבד — אלה מה שהכרית המשותפת סופגת."
           action={
             committed ? undefined : (
               <Button
@@ -514,7 +533,7 @@ function ReconcileStep({
                   onChanged();
                 }}
               >
-                <Lock className="size-3.5" /> Commit month
+                <Lock className="size-3.5" /> נעילת החודש
               </Button>
             )
           }
@@ -522,11 +541,11 @@ function ReconcileStep({
         <CardBody>
           {flexible.length === 0 ? (
             <p className="text-fg-subtle text-xs">
-              No flexible categories planned. Set them on the{' '}
+              לא תוכננו קטגוריות משתנות. אפשר להגדיר אותן ב
               <Link to="/budget" className="text-brand underline">
-                Budget page
+                עמוד התקציב
               </Link>{' '}
-              to compare against actuals.
+              כדי להשוות מול הבפועל.
             </p>
           ) : (
             <div className="space-y-2.5">
@@ -539,7 +558,7 @@ function ReconcileStep({
                     <div className="mb-1 flex items-baseline justify-between text-xs">
                       <span>{line.category_name}</span>
                       <span className={cn('tnum', over ? 'text-negative' : 'text-fg-muted')}>
-                        {formatAgorot(actual)} of {formatAgorot(line.planned_amount)}
+                        {formatAgorot(actual)} מתוך {formatAgorot(line.planned_amount)}
                       </span>
                     </div>
                     <div className="bg-surface-2 h-1.5 overflow-hidden rounded-full">

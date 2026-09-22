@@ -69,13 +69,52 @@ M2 import (Israeli adapters, mapping wizard, dedupe, **historical backfill mode*
 M3 normalizer+rules engine+manual entry+recurring templates |
 M4 Ollama categorizer | M5 Triage UI (joint/personal sweep, auto-accept >=0.9) |
 M6 wallets + period engine + transfers + shortfall dialog |
-M7 dashboard + Monthly Run wizard | M8 insights | M9 polish/packaging | M10 Tauri desktop shell.
+M7 dashboard + Monthly Run wizard | M8 insights | M9 polish/packaging | M10 Tauri desktop shell |
+M11 UX rework (nav 8->5, global month switcher, import undo) + full Hebrew RTL.
 
 ## Status
-**M0-M10 IMPLEMENTED. App runs both in the browser and as a native desktop window.**
+**M0-M11 IMPLEMENTED. Hebrew RTL app, runs in the browser and as a native desktop window.**
 VS2022 Community already has the "Desktop development with C++" workload (verified via vswhere).
 Rust 1.98.1 (stable-x86_64-pc-windows-msvc) installed.
 GitHub repo: https://github.com/omerpintel/Budget.git
+
+### M11 UX rework + Hebrew RTL facts
+Driven by the user reporting the app was confusing: too many tabs, no way to browse other
+months, no way to undo an upload.
+- **Nav collapsed 8 -> 5**: מרכז (/) · סגירת חודש (/run) · תנועות (/transactions) ·
+  תקציב (/budget) · הגדרות (/settings). Import and Triage are no longer nav entries — they were
+  duplicate doors to screens already embedded in the Monthly Run wizard. `/import` and `/triage`
+  now redirect into the wizard so old links still work.
+- **Insights is not in the nav** but is still routed at `/insights`, reached from the "שווה מבט"
+  card on the overview. It was NOT deleted, because it owns the subscription-dismiss control.
+- **`src/state/period.tsx` is the single source of truth for the selected month.**
+  `PeriodProvider` wraps the router; `usePeriod()` gives `{ref, isCurrent, shiftBy, goToCurrent}`.
+  `PeriodSwitcher` lives in the AppShell topbar. Overview / Run / Transactions / Budget / Insights
+  all read it — the four independent period dropdowns they each had are gone.
+- **Browsing to a month must never create it.** Pages use `findPeriod` (returns null) and show an
+  empty state; only the current month auto-`ensurePeriod`s, plus an explicit "open this month"
+  button on the Run page. Otherwise arrowing through months litters `budget_periods`.
+- **Import undo**: `deleteImportBatch()` in `data/imports.ts`; `transactions.import_batch_id` is
+  `ON DELETE CASCADE` but the rows are deleted explicitly too, then the period is recomputed.
+  `listImportHistory()` reports `live_count` and `reviewed_count` so the confirm step can warn.
+  UI is `features/import/ImportHistory.tsx`, used on the overview and in Run step 2.
+- **RTL**: `index.html` is `lang="he" dir="rtl"`. Physical Tailwind utilities were converted to
+  logical ones (`border-e`, `ps-`/`pe-`, `text-start`/`text-end`). Heebo is now the primary font.
+- **`.dir-icon` (index.css) mirrors arrow icons** that express direction of travel. Lucide
+  Arrow/Chevron icons do not flip on their own.
+- **Money must be bidi-isolated.** `formatAgorot` wraps output in U+2066…U+2069 (LRI…PDI), because
+  "₪0" and "−₪1,250" get reordered by the bidi algorithm when they sit in Hebrew prose — "₪0"
+  rendered as "0₪" while "₪28,284" rendered correctly, in the same row of cards.
+  `stripBidi()` is exported for comparisons. `.tnum` additionally sets `direction: ltr; unicode-bidi: isolate`.
+  **`MoneyInput` deliberately uses PHYSICAL `right-3 / pr-7 / text-right`** — `.tnum` forces the
+  field to LTR, so logical padding would resolve away from the ₪ affix and overlap the digits.
+- **Category and wallet names are DATA**, so translating `db/seed.ts` was not enough:
+  migration **v2 `hebrew_default_names`** renames seeded categories + joint/savings wallets, and
+  **v3 `hebrew_personal_wallet_names`** renames "<person>'s Wallet". Both match on the old English
+  name as well as the slug, so anything the user renamed themselves is left untouched.
+  Verified against the real desktop DB: migrations 1-3 applied, 42 transactions preserved.
+- Ollama: `OLLAMA_ORIGINS` must include `http://tauri.localhost` (User-scope env var) or every
+  request from the desktop app fails CORS and surfaces as a bare "Failed to fetch".
 
 ### M10 desktop facts
 - `src-tauri/` is a Tauri v2 shell. `npm run desktop` = `tauri dev`, `npm run desktop:build` = installer.

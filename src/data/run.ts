@@ -148,19 +148,3 @@ export async function listManualOutflows(periodId: string): Promise<PeriodManual
     [periodId],
   );
 }
-
-export async function listImportBatches(periodId: string) {
-  return getDb().select<{
-    id: string;
-    file_name: string;
-    debit_date: string;
-    row_count: number;
-    account_name: string;
-  }>(
-    `SELECT b.id, b.file_name, b.debit_date, b.row_count, a.display_name AS account_name
-     FROM import_batches b JOIN accounts a ON a.id = b.account_id
-     WHERE b.target_period_id = ?
-     ORDER BY b.imported_at`,
-    [periodId],
-  );
-}
