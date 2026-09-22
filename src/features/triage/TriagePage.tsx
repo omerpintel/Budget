@@ -22,6 +22,7 @@ import {
   commitDecision,
   getQuickCategories,
   loadTriage,
+  setTriageCategory,
   type TriageDecision,
   type TriageRow,
 } from '@/data/triage';
@@ -124,6 +125,11 @@ export function TriagePage({
     },
     [qc, savingsWalletId],
   );
+
+  async function handleAutoCategoryChange(rowId: string, categoryId: string | null) {
+    await setTriageCategory(rowId, categoryId);
+    await qc.invalidateQueries({ queryKey: ['triage'] });
+  }
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -296,7 +302,20 @@ export function TriagePage({
                           <td className="px-4 py-2">
                             <MerchantText value={row.raw_description} />
                           </td>
-                          <td className="w-40 px-4 py-2">{row.category_name}</td>
+                          <td className="w-44 px-4 py-2">
+                            <Select
+                              className="h-7 text-xs"
+                              value={row.category_id ?? ''}
+                              onChange={(e) => void handleAutoCategoryChange(row.id, e.target.value || null)}
+                            >
+                              <option value="">— ללא —</option>
+                              {categories.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </Select>
+                          </td>
                           <td className="w-28 px-4 py-2">
                             <SourceBadge row={row} />
                           </td>

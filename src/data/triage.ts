@@ -117,6 +117,14 @@ export async function undoReview(transactionId: string): Promise<void> {
   );
 }
 
+/** Lets a user correct an auto-applied row's category without dropping it back into the manual queue. */
+export async function setTriageCategory(transactionId: string, categoryId: string | null): Promise<void> {
+  await getDb().execute(
+    `UPDATE transactions SET category_id = ?, categorization_source = 'user', updated_at = ? WHERE id = ?`,
+    [categoryId, nowIso(), transactionId],
+  );
+}
+
 /** Categories ordered by how often they have actually been used, for the number keys. */
 export async function getQuickCategories(limit = 9): Promise<Array<{ id: string; name: string }>> {
   return getDb().select<{ id: string; name: string }>(
