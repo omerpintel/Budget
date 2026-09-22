@@ -73,10 +73,42 @@ M7 dashboard + Monthly Run wizard | M8 insights | M9 polish/packaging | M10 Taur
 M11 UX rework (nav 8->5, global month switcher, import undo) + full Hebrew RTL.
 
 ## Status
-**M0-M11 IMPLEMENTED. Hebrew RTL app, runs in the browser and as a native desktop window.**
+**M0-M12 IMPLEMENTED. Hebrew RTL app, runs in the browser and as a native desktop window.**
 VS2022 Community already has the "Desktop development with C++" workload (verified via vswhere).
 Rust 1.98.1 (stable-x86_64-pc-windows-msvc) installed.
 GitHub repo: https://github.com/omerpintel/Budget.git
+
+### M12 categories + allocation facts
+- **Monthly Run is 5 steps now**: בנק · ייבוא · מיון · שיוך · התאמה. `FINAL_STEP` in `runModel.ts`
+  is derived from `RUN_STEPS.length`, so never hard-code the last index again.
+  `deriveStep` intentionally stops at שיוך (3) rather than running on to התאמה: allocation is a
+  judgement call, not a checklist item.
+- **Ollama runs automatically** in the מיון step via `features/triage/AutoCategorize.tsx`. It
+  health-checks first so an unreachable service is a note, not an error, and fires once per period.
+  Before this, `categorizeWithAi` was only reachable from the transactions page, so the wizard
+  never used the model at all.
+- Default model is `gemma3:4b`. `gemma3:12b` was the old default and is a large download that is
+  usually not present, which made the AI path fail silently for a fresh install.
+- `autoAcceptThreshold` decides auto-applied vs queued in triage. Exposed as a slider in Settings.
+- **Categories were consolidated 31 -> 13** by migration v4 `consolidate_categories`. The merge
+  list and renames live at the top of that migration. Rules worth keeping in mind:
+  - `budget_lines` is UNIQUE(period_id, category_id), so amounts are **folded into the target row
+    before** the remap, then colliding source rows are deleted. Remapping first would throw.
+  - Every statement carries a guard that both slugs resolve; a missing target would otherwise
+    null out `category_id` on real transactions.
+  - Merged categories are archived (`is_archived = 1`), never deleted, so history stays readable.
+  - Verified on the real ledger: 41 transactions, 0 orphaned, 0 nulled, 0 left on archived rows.
+- **`listAllocationLines`** returns every spendable category whether or not it has a plan row.
+  The old screen used `listBudgetLines`, which only returned categories that already had a row,
+  so a category was invisible until it was added from a dropdown. That was the main confusion.
+- **`features/budget/AllocationPlanner.tsx`** replaces the old AllocationCard and is shared by the
+  budget page and the wizard's שיוך step. Two assistants, both backed by pure functions in
+  `services/budget/engine.ts` (`coverDeficits`, `spreadByWeight`, tested in `allocation.test.ts`):
+  - `coverDeficits` raises plans to actual spend, **smallest gap first**, so a short pot closes as
+    many lines as possible instead of sinking into the worst one. Covers personal allowances too.
+  - `spreadByWeight` splits the remainder weighted by `averageSpendByCategory` over recent months,
+    falling back to an even split; the rounding remainder lands on the heaviest target so the
+    parts always sum to exactly the input.
 
 ### M11 UX rework + Hebrew RTL facts
 Driven by the user reporting the app was confusing: too many tabs, no way to browse other

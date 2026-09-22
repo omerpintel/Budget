@@ -162,6 +162,76 @@ export interface CategoryVariance {
   delta: number;
 }
 
+export interface AllocationTarget {
+  id: string;
+  planned: number;
+  actual: number;
+}
+
+export interface AllocationStep {
+  assignments: Record<string, number>;
+  used: number;
+}
+
+/**
+ * Brings each plan up to what was actually spent. Smallest gap first, so a pot
+ * that cannot cover everything still closes as many categories as possible
+ * rather than sinking into the single worst one.
+ */
+export function coverDeficits(targets: AllocationTarget[], available: number): AllocationStep {
+  const gaps = targets
+    .map((t) => ({ id: t.id, gap: t.actual - t.planned }))
+    .filter((g) => g.gap > 0)
+    .sort((a, b) => a.gap - b.gap);
+
+  const assignments: Record<string, number> = {};
+  let left = Math.max(available, 0);
+
+  for (const { id, gap } of gaps) {
+    if (left <= 0) break;
+    const give = Math.min(gap, left);
+    assignments[id] = give;
+    left -= give;
+  }
+
+  return { assignments, used: Math.max(available, 0) - left };
+}
+
+/**
+ * Splits `amount` across weighted targets. Weights of zero fall back to an even
+ * split, and the rounding remainder lands on the heaviest target so the parts
+ * always add back up to `amount` exactly.
+ */
+export function spreadByWeight(
+  targets: Array<{ id: string; weight: number }>,
+  amount: number,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (targets.length === 0 || amount <= 0) return result;
+
+  const totalWeight = targets.reduce((s, t) => s + Math.max(t.weight, 0), 0);
+  const even = totalWeight <= 0;
+  let allocated = 0;
+
+  for (const t of targets) {
+    const share = even
+      ? Math.floor(amount / targets.length)
+      : Math.floor((amount * Math.max(t.weight, 0)) / totalWeight);
+    result[t.id] = share;
+    allocated += share;
+  }
+
+  const remainder = amount - allocated;
+  if (remainder > 0) {
+    const heaviest = even
+      ? targets[0]
+      : targets.reduce((a, b) => (Math.max(b.weight, 0) > Math.max(a.weight, 0) ? b : a));
+    result[heaviest.id] += remainder;
+  }
+
+  return result;
+}
+
 export function computeVariance(
   lines: PlanLine[],
   actuals: Record<string, number>,

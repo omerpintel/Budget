@@ -24,6 +24,7 @@ import { ImportHistory } from '@/features/import/ImportHistory';
 import { TriagePage } from '@/features/triage/TriagePage';
 import { AutoCategorize } from '@/features/triage/AutoCategorize';
 import { ShortfallDialog } from '@/features/budget/ShortfallDialog';
+import { AllocationPlanner } from '@/features/budget/AllocationPlanner';
 import { ensurePeriod, findPeriod } from '@/data/periods';
 import { listImportHistory } from '@/data/imports';
 import {
@@ -133,7 +134,8 @@ export function MonthlyRunPage() {
       {step === 0 && <BankStep periodId={period.id} periodRef={ref} onChanged={invalidate} />}
       {step === 1 && <ImportStep periodId={period.id} />}
       {step === 2 && <TriageStep periodId={period.id} unreviewed={status.unreviewed} />}
-      {step === 3 && <ReconcileStep periodId={period.id} committed={status.committed} onChanged={invalidate} />}
+      {step === 3 && <AllocationPlanner periodId={period.id} disabled={status.committed} />}
+      {step === 4 && <ReconcileStep periodId={period.id} committed={status.committed} onChanged={invalidate} />}
 
       <div className="mt-5 flex items-center justify-between">
         <Button

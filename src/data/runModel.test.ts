@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deriveStep, isStepComplete, type RunStatus } from './runModel';
+import { deriveStep, FINAL_STEP, isStepComplete, type RunStatus } from './runModel';
 
 const status = (partial: Partial<RunStatus> = {}): RunStatus => ({
   hasIncome: false,
@@ -22,13 +22,13 @@ describe('deriveStep', () => {
     expect(deriveStep(status({ hasIncome: true, importedBatches: 1, unreviewed: 5 }))).toBe(2);
   });
 
-  it('reaches reconcile when nothing is left to review', () => {
+  it('stops at allocation when nothing is left to review', () => {
     expect(deriveStep(status({ hasIncome: true, importedBatches: 1, unreviewed: 0 }))).toBe(3);
   });
 
   it('pins a committed period to the final step regardless of anything else', () => {
-    expect(deriveStep(status({ committed: true }))).toBe(3);
-    expect(deriveStep(status({ committed: true, unreviewed: 99 }))).toBe(3);
+    expect(deriveStep(status({ committed: true }))).toBe(FINAL_STEP);
+    expect(deriveStep(status({ committed: true, unreviewed: 99 }))).toBe(FINAL_STEP);
   });
 
   it('resumes mid-run rather than restarting', () => {
@@ -49,7 +49,12 @@ describe('isStepComplete', () => {
   });
 
   it('marks reconcile complete only after commit', () => {
-    expect(isStepComplete(status({ hasIncome: true, importedBatches: 1 }), 3)).toBe(false);
-    expect(isStepComplete(status({ committed: true }), 3)).toBe(true);
+    expect(isStepComplete(status({ hasIncome: true, importedBatches: 1 }), FINAL_STEP)).toBe(false);
+    expect(isStepComplete(status({ committed: true }), FINAL_STEP)).toBe(true);
+  });
+
+  it('opens allocation once triage is clear, without needing a commit', () => {
+    expect(isStepComplete(status({ importedBatches: 1, unreviewed: 0 }), 3)).toBe(true);
+    expect(isStepComplete(status({ importedBatches: 1, unreviewed: 4 }), 3)).toBe(false);
   });
 });

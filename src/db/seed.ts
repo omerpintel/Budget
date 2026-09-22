@@ -9,38 +9,22 @@ interface SeedCategory {
   isSystem?: boolean;
 }
 
-/** Defaults tuned for an Israeli household; fully editable in Settings. */
+/** Deliberately few: a two-person household never reliably sorts into more. */
 export const DEFAULT_CATEGORIES: SeedCategory[] = [
   { slug: 'salary', name: 'משכורת', kind: 'income', isSystem: true },
   { slug: 'other-income', name: 'הכנסה אחרת', kind: 'income' },
-  { slug: 'refund', name: 'זיכויים והחזרים', kind: 'income' },
 
-  { slug: 'rent', name: 'שכר דירה', kind: 'fixed' },
-  { slug: 'mortgage', name: 'משכנתא', kind: 'fixed' },
-  { slug: 'arnona', name: 'ארנונה', kind: 'fixed' },
-  { slug: 'utilities', name: 'חשמל, מים וגז', kind: 'fixed' },
-  { slug: 'internet-tv', name: 'אינטרנט וטלוויזיה', kind: 'fixed' },
-  { slug: 'mobile', name: 'סלולר', kind: 'fixed' },
-  { slug: 'insurance', name: 'ביטוח', kind: 'fixed' },
-  { slug: 'health', name: 'בריאות וקופת חולים', kind: 'fixed' },
-  { slug: 'vehicle-fixed', name: 'הוצאות רכב קבועות', kind: 'fixed' },
-  { slug: 'education', name: 'חינוך ומעונות', kind: 'fixed' },
-  { slug: 'loans', name: 'החזרי הלוואות', kind: 'fixed' },
+  { slug: 'rent', name: 'דיור', kind: 'fixed' },
+  { slug: 'utilities', name: 'חשבונות הבית', kind: 'fixed' },
+  { slug: 'insurance', name: 'ביטוח ובריאות', kind: 'fixed' },
+  { slug: 'vehicle-fixed', name: 'רכב', kind: 'fixed' },
+  { slug: 'loans', name: 'התחייבויות וחינוך', kind: 'fixed' },
 
   { slug: 'groceries', name: 'סופר ומכולת', kind: 'flexible' },
-  { slug: 'restaurants', name: 'מסעדות ובתי קפה', kind: 'flexible' },
-  { slug: 'fuel', name: 'דלק', kind: 'flexible' },
-  { slug: 'transport', name: 'תחבורה וחניה', kind: 'flexible' },
-  { slug: 'pharmacy', name: 'פארם וטיפוח', kind: 'flexible' },
-  { slug: 'home', name: 'בית וריהוט', kind: 'flexible' },
-  { slug: 'clothing', name: 'ביגוד והנעלה', kind: 'flexible' },
-  { slug: 'entertainment', name: 'בילויים ותרבות', kind: 'flexible' },
-  { slug: 'subscriptions', name: 'מנויים ודיגיטל', kind: 'flexible' },
-  { slug: 'travel', name: 'טיולים וחופשות', kind: 'flexible' },
-  { slug: 'gifts', name: 'מתנות ואירועים', kind: 'flexible' },
-  { slug: 'pets', name: 'חיות מחמד', kind: 'flexible' },
-  { slug: 'sport', name: 'ספורט וכושר', kind: 'flexible' },
-  { slug: 'kids', name: 'ילדים', kind: 'flexible' },
+  { slug: 'restaurants', name: 'אוכל בחוץ', kind: 'flexible' },
+  { slug: 'fuel', name: 'תחבורה ודלק', kind: 'flexible' },
+  { slug: 'home', name: 'קניות ובית', kind: 'flexible' },
+  { slug: 'entertainment', name: 'פנאי ומנויים', kind: 'flexible' },
   { slug: 'misc', name: 'שונות', kind: 'flexible' },
   { slug: 'uncategorized', name: 'ללא קטגוריה', kind: 'flexible', isSystem: true },
 

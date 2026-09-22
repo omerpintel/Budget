@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Copy, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, Lock, LockOpen, Plus, Trash2 } from 'lucide-react';
 import { PageHeader, EmptyState } from '@/components/ui/Feedback';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, MoneyInput, Select } from '@/components/ui/Field';
 import { WalletCard } from '@/components/WalletCard';
 import { ShortfallDialog } from './ShortfallDialog';
+import { AllocationPlanner } from './AllocationPlanner';
 import { findPeriod } from '@/data/periods';
 import { listWallets } from '@/data/wallets';
 import { listPeople } from '@/data/people';
@@ -18,9 +19,6 @@ import {
   listIncomes,
   listPersonalBudgets,
   removeIncome,
-  seedPlanFromPrevious,
-  setAllowance,
-  setBudgetLine,
   updateIncome,
 } from '@/data/budget';
 import {
@@ -32,16 +30,8 @@ import {
   removeTransfer,
   reopenPeriod,
 } from '@/data/periodEngine';
-import { leftToAssign } from '@/services/budget/engine';
 import { formatAgorot, parseMoneyInput, periodLabel, toMajor } from '@/lib/money';
 import { usePeriod } from '@/state/period';
-import { cn } from '@/lib/utils';
-
-const KIND_LABELS: Record<'fixed' | 'flexible' | 'savings', string> = {
-  fixed: 'הוצאות קבועות',
-  flexible: 'הוצאות משתנות',
-  savings: 'חיסכון',
-};
 
 export function BudgetPage() {
   const qc = useQueryClient();
@@ -100,7 +90,7 @@ export function BudgetPage() {
   }
   if (!data || !period) return null;
 
-  const { result, lines, allowances, incomes, actuals, wallets, people, categories, transfers } = data;
+  const { result, incomes, wallets, people, transfers } = data;
   const personName = (id: string | null) => people.find((p) => p.id === id)?.name ?? 'לא ידוע';
   const jointWallet = wallets.find((w) => w.kind === 'joint_buffer');
   const balances = new Map(
@@ -109,14 +99,6 @@ export function BudgetPage() {
       if (w.kind === 'savings') return [w.id, result.savings.closing];
       return [w.id, w.person_id ? (result.personal[w.person_id]?.closing ?? 0) : 0];
     }),
-  );
-
-  const plannedIncome = incomes.reduce((s, i) => s + i.amount, 0);
-  const allowanceMap = Object.fromEntries(allowances.map((a) => [a.person_id, a.allowance]));
-  const unassigned = leftToAssign(
-    plannedIncome,
-    lines.map((l) => ({ categoryId: l.category_id, planned: l.planned_amount })),
-    allowanceMap,
   );
 
   const committed = period.status === 'committed';
@@ -213,18 +195,7 @@ export function BudgetPage() {
           onChanged={invalidate}
         />
 
-        <AllocationCard
-          periodId={periodId}
-          lines={lines}
-          categories={categories}
-          allowances={allowances}
-          people={people}
-          actuals={actuals.byCategory}
-          unassigned={unassigned}
-          income={plannedIncome}
-          disabled={committed}
-          onChanged={invalidate}
-        />
+        <AllocationPlanner periodId={periodId} disabled={committed} />
 
         <TransfersCard
           periodId={periodId}
@@ -348,207 +319,6 @@ function IncomeCard({
             <Plus className="size-4" /> הוספה
           </Button>
         </div>
-      </CardBody>
-    </Card>
-  );
-}
-
-function AllocationCard({
-  periodId,
-  lines,
-  categories,
-  allowances,
-  people,
-  actuals,
-  unassigned,
-  income,
-  disabled,
-  onChanged,
-}: {
-  periodId: string;
-  lines: Array<{ category_id: string; category_name: string; kind: string; planned_amount: number }>;
-  categories: Array<{ id: string; name: string; kind: string }>;
-  allowances: Array<{ person_id: string; allowance: number }>;
-  people: Array<{ id: string; name: string }>;
-  actuals: Record<string, number>;
-  unassigned: number;
-  income: number;
-  disabled: boolean;
-  onChanged: () => void;
-}) {
-  const [adding, setAdding] = useState('');  const planned = lines.map((l) => l.category_id);
-  const addable = categories.filter(
-    (c) => !planned.includes(c.id) && ['fixed', 'flexible', 'savings'].includes(c.kind),
-  );
-
-  const grouped = useMemo(
-    () => ({
-      fixed: lines.filter((l) => l.kind === 'fixed'),
-      flexible: lines.filter((l) => l.kind === 'flexible'),
-      savings: lines.filter((l) => l.kind === 'savings'),
-    }),
-    [lines],
-  );
-
-  return (
-    <Card>
-      <CardHeader
-        title="שיוך"
-        description="הכנסה פחות הוצאות קבועות, דמי כיס וחיסכון — מה שנשאר הוא התקציב המשותף המשתנה."
-        action={
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={disabled}
-              onClick={async () => {
-                await seedPlanFromPrevious(periodId);
-                onChanged();
-              }}
-            >
-              <Copy className="size-3.5" /> העתק מהחודש שעבר
-            </Button>
-          </div>
-        }
-      />
-      <CardBody className="space-y-4">
-        <div
-          className={cn(
-            'flex items-center justify-between rounded-lg border p-3',
-            unassigned === 0
-              ? 'border-positive/40 bg-positive/10'
-              : unassigned > 0
-                ? 'border-line bg-surface-2/40'
-                : 'border-negative/40 bg-negative/10',
-          )}
-        >
-          <span className="text-xs font-medium">
-            {unassigned === 0
-              ? 'לכל שקל יש תפקיד'
-              : unassigned > 0
-                ? 'נותר לשייך'
-                : 'שויך יותר מדי'}
-          </span>
-          <span className="tnum text-sm font-semibold">{formatAgorot(unassigned)}</span>
-        </div>
-
-        {income === 0 && (
-          <p className="text-fg-subtle text-xs">הזן למעלה את ההכנסות של החודש כדי להתחיל לשייך.</p>
-        )}
-
-        {(['fixed', 'flexible', 'savings'] as const).map((kind) =>
-          grouped[kind].length === 0 ? null : (
-            <div key={kind}>
-              <div className="text-fg-muted mb-1.5 text-xs font-medium">{KIND_LABELS[kind]}</div>
-              <table className="w-full text-xs">
-                <thead className="text-fg-subtle">
-                  <tr className="text-start">
-                    <th className="pb-1 font-medium">קטגוריה</th>
-                    <th className="w-28 pb-1 font-medium">מתוכנן</th>
-                    <th className="w-24 pb-1 text-end font-medium">בפועל</th>
-                    <th className="w-24 pb-1 text-end font-medium">נותר</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {grouped[kind].map((line) => {
-                    const actual = actuals[line.category_id] ?? 0;
-                    const left = line.planned_amount - actual;
-                    return (
-                      <tr key={line.category_id} className="border-line/60 border-t">
-                        <td className="py-1.5">{line.category_name}</td>
-                        <td className="py-1.5">
-                          <MoneyInput
-                            key={`${periodId}-${line.category_id}-${line.planned_amount}`}
-                            className="h-7 text-xs"
-                            disabled={disabled}
-                            defaultValue={String(toMajor(line.planned_amount))}
-                            onBlur={async (e) => {
-                              const value = parseMoneyInput(e.target.value);
-                              if (value !== null && value !== line.planned_amount) {
-                                await setBudgetLine(periodId, line.category_id, value);
-                                onChanged();
-                              }
-                            }}
-                          />
-                        </td>
-                        <td className="tnum py-1.5 text-end">{formatAgorot(actual)}</td>
-                        <td
-                          className={cn(
-                            'tnum py-1.5 text-end',
-                            left < 0 ? 'text-negative' : 'text-fg-muted',
-                          )}
-                        >
-                          {formatAgorot(left)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ),
-        )}
-
-        <div>
-          <div className="text-fg-muted mb-1.5 text-xs font-medium">דמי כיס אישיים</div>
-          <table className="w-full text-xs">
-            <tbody>
-              {people.map((person) => {
-                const current = allowances.find((a) => a.person_id === person.id)?.allowance ?? 0;
-                return (
-                  <tr key={person.id} className="border-line/60 border-t">
-                    <td className="py-1.5">{person.name}</td>
-                    <td className="w-28 py-1.5">
-                      <MoneyInput
-                        key={`${periodId}-${person.id}-${current}`}
-                        className="h-7 text-xs"
-                        disabled={disabled}
-                        defaultValue={String(toMajor(current))}
-                        onBlur={async (e) => {
-                          const value = parseMoneyInput(e.target.value);
-                          if (value !== null && value !== current) {
-                            await setAllowance(periodId, person.id, value);
-                            onChanged();
-                          }
-                        }}
-                      />
-                    </td>
-                    <td className="text-fg-subtle py-1.5 text-xs">
-                      מועבר גם אם לא מנוצל; מה שנשאר מתגלגל ל{person.name}.
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {addable.length > 0 && (
-          <div className="flex items-end gap-2">
-            <Field label="הוספת קטגוריה לתוכנית" className="max-w-64">
-              <Select value={adding} disabled={disabled} onChange={(e) => setAdding(e.target.value)}>
-                <option value="">— בחר —</option>
-                {addable.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Button
-              size="md"
-              variant="secondary"
-              disabled={disabled || !adding}
-              onClick={async () => {
-                await setBudgetLine(periodId, adding, 0);
-                setAdding('');
-                onChanged();
-              }}
-            >
-              <Plus className="size-4" /> הוספה
-            </Button>
-          </div>
-        )}
       </CardBody>
     </Card>
   );

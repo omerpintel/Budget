@@ -367,4 +367,78 @@ const hebrewPersonalWallets: Migration = {
   ],
 };
 
-export const migrations: Migration[] = [initialSchema, hebrewDefaults, hebrewPersonalWallets];
+/**
+ * Thirty-one categories was more than a two-person household ever sorts into.
+ * Each pair folds the first slug into the second; the survivors are then renamed.
+ * Nothing is deleted — merged categories are archived so old rows stay readable.
+ */
+const MERGES: ReadonlyArray<readonly [string, string]> = [
+  ['refund', 'other-income'],
+  ['mortgage', 'rent'],
+  ['arnona', 'rent'],
+  ['internet-tv', 'utilities'],
+  ['mobile', 'utilities'],
+  ['health', 'insurance'],
+  ['education', 'loans'],
+  ['transport', 'fuel'],
+  ['clothing', 'home'],
+  ['pharmacy', 'home'],
+  ['subscriptions', 'entertainment'],
+  ['sport', 'entertainment'],
+  ['travel', 'entertainment'],
+  ['pets', 'misc'],
+  ['kids', 'misc'],
+  ['gifts', 'misc'],
+];
+
+const RENAMES: ReadonlyArray<readonly [string, string]> = [
+  ['rent', 'דיור'],
+  ['utilities', 'חשבונות הבית'],
+  ['insurance', 'ביטוח ובריאות'],
+  ['vehicle-fixed', 'רכב'],
+  ['loans', 'התחייבויות וחינוך'],
+  ['restaurants', 'אוכל בחוץ'],
+  ['fuel', 'תחבורה ודלק'],
+  ['home', 'קניות ובית'],
+  ['entertainment', 'פנאי ומנויים'],
+];
+
+const id = (slug: string) => `(SELECT id FROM categories WHERE slug = '${slug}')`;
+
+function mergeStatements(from: string, to: string): string[] {
+  // Guard: a missing target would otherwise null out every category_id it touches.
+  const guard = `${id(from)} IS NOT NULL AND ${id(to)} IS NOT NULL`;
+  return [
+    // budget_lines is unique per (period, category), so amounts are folded before remapping.
+    `UPDATE budget_lines SET planned_amount = planned_amount + COALESCE(
+       (SELECT b2.planned_amount FROM budget_lines b2
+         WHERE b2.period_id = budget_lines.period_id AND b2.category_id = ${id(from)}), 0)
+     WHERE category_id = ${id(to)} AND ${guard}`,
+    `DELETE FROM budget_lines WHERE category_id = ${id(from)} AND ${guard}
+       AND period_id IN (SELECT period_id FROM budget_lines WHERE category_id = ${id(to)})`,
+    `UPDATE budget_lines SET category_id = ${id(to)} WHERE category_id = ${id(from)} AND ${guard}`,
+
+    `UPDATE transactions SET category_id = ${id(to)} WHERE category_id = ${id(from)} AND ${guard}`,
+    `UPDATE merchants SET default_category_id = ${id(to)} WHERE default_category_id = ${id(from)} AND ${guard}`,
+    `UPDATE merchant_rules SET category_id = ${id(to)} WHERE category_id = ${id(from)} AND ${guard}`,
+    `UPDATE recurring_entries SET category_id = ${id(to)} WHERE category_id = ${id(from)} AND ${guard}`,
+
+    `UPDATE categories SET is_archived = 1 WHERE slug = '${from}' AND is_system = 0`,
+  ];
+}
+
+const consolidateCategories: Migration = {
+  version: 4,
+  name: 'consolidate_categories',
+  statements: [
+    ...MERGES.flatMap(([from, to]) => mergeStatements(from, to)),
+    ...RENAMES.map(([slug, name]) => `UPDATE categories SET name = '${name}' WHERE slug = '${slug}'`),
+  ],
+};
+
+export const migrations: Migration[] = [
+  initialSchema,
+  hebrewDefaults,
+  hebrewPersonalWallets,
+  consolidateCategories,
+];

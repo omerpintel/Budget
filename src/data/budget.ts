@@ -19,6 +19,23 @@ export async function listBudgetLines(periodId: string): Promise<BudgetLineRow[]
   );
 }
 
+/**
+ * Every spendable category, whether or not it has been given a plan yet. The plan
+ * screen shows all of them so nothing has to be hunted for in a dropdown first.
+ */
+export async function listAllocationLines(periodId: string): Promise<BudgetLineRow[]> {
+  return getDb().select<BudgetLineRow>(
+    `SELECT COALESCE(b.id, c.id) AS id, c.id AS category_id, c.name AS category_name, c.kind,
+            COALESCE(b.planned_amount, 0) AS planned_amount
+     FROM categories c
+     LEFT JOIN budget_lines b ON b.category_id = c.id AND b.period_id = ?
+     WHERE c.is_archived = 0
+       AND c.kind IN ('fixed', 'flexible', 'savings')
+     ORDER BY c.kind, c.sort_order, c.name`,
+    [periodId],
+  );
+}
+
 export async function setBudgetLine(
   periodId: string,
   categoryId: string,
@@ -34,6 +51,25 @@ export async function setBudgetLine(
   );
 }
 
+/** Applies a whole allocation pass at once, so a half-written plan is impossible. */
+export async function setBudgetLines(
+  periodId: string,
+  amounts: Record<string, number>,
+): Promise<void> {
+  const entries = Object.entries(amounts);
+  if (entries.length === 0) return;
+  const ts = nowIso();
+  await getDb().batch(
+    entries.map(([categoryId, planned]) => ({
+      sql: `INSERT INTO budget_lines (id, period_id, category_id, planned_amount, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(period_id, category_id) DO UPDATE SET
+              planned_amount = excluded.planned_amount, updated_at = excluded.updated_at`,
+      params: [uuid(), periodId, categoryId, planned, ts, ts],
+    })),
+  );
+}
+
 export interface PersonalBudgetRow {
   person_id: string;
   allowance: number;
@@ -46,6 +82,37 @@ export async function listPersonalBudgets(periodId: string): Promise<PersonalBud
   return getDb().select<PersonalBudgetRow>(
     'SELECT person_id, allowance, rollover_in, spent, rollover_out FROM personal_budgets WHERE period_id = ?',
     [periodId],
+  );
+}
+
+/**
+ * Average monthly outflow per category over recent closed months, used to weight
+ * an automatic split. Months before the category existed are not counted.
+ */
+export async function averageSpendByCategory(
+  excludePeriodId: string,
+  months = 3,
+): Promise<Record<string, number>> {
+  const rows = await getDb().select<{ category_id: string; total: number; periods: number }>(
+    `SELECT t.category_id, SUM(t.amount) AS total, COUNT(DISTINCT t.period_id) AS periods
+     FROM transactions t
+     WHERE t.direction = 'out'
+       AND t.is_excluded = 0
+       AND t.category_id IS NOT NULL
+       AND t.period_id IS NOT NULL
+       AND t.period_id != ?
+       AND t.period_id IN (
+         SELECT id FROM budget_periods
+         WHERE id != ?
+         ORDER BY year DESC, month DESC
+         LIMIT ?
+       )
+     GROUP BY t.category_id`,
+    [excludePeriodId, excludePeriodId, months],
+  );
+
+  return Object.fromEntries(
+    rows.map((r) => [r.category_id, Math.round(r.total / Math.max(r.periods, 1))]),
   );
 }
 
