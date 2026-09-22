@@ -22,6 +22,7 @@ import { MerchantText } from '@/components/MerchantText';
 import { ImportPage } from '@/features/import/ImportPage';
 import { ImportHistory } from '@/features/import/ImportHistory';
 import { TriagePage } from '@/features/triage/TriagePage';
+import { AutoCategorize } from '@/features/triage/AutoCategorize';
 import { ShortfallDialog } from '@/features/budget/ShortfallDialog';
 import { ensurePeriod, findPeriod } from '@/data/periods';
 import { listImportHistory } from '@/data/imports';
@@ -427,7 +428,12 @@ function TriageStep({ periodId, unreviewed }: { periodId: string; unreviewed: nu
       </Card>
     );
   }
-  return <TriagePage embedded fixedPeriodId={periodId} />;
+  return (
+    <>
+      <AutoCategorize periodId={periodId} />
+      <TriagePage embedded fixedPeriodId={periodId} />
+    </>
+  );
 }
 
 function ReconcileStep({

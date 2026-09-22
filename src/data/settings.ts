@@ -18,7 +18,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   [SETTING_KEYS.closeDay]: '10',
   [SETTING_KEYS.theme]: 'dark',
   [SETTING_KEYS.ollamaUrl]: 'http://localhost:11434',
-  [SETTING_KEYS.ollamaModel]: 'gemma3:12b',
+  [SETTING_KEYS.ollamaModel]: 'gemma3:4b',
   [SETTING_KEYS.ollamaEnabled]: '1',
   [SETTING_KEYS.autoAcceptThreshold]: '0.9',
   [SETTING_KEYS.lastBackupAt]: '',

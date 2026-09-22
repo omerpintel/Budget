@@ -136,6 +136,23 @@ export function SettingsPage() {
               </Field>
             </div>
 
+            <Field
+              label={`אישור אוטומטי מרמת ביטחון ${Math.round(Number(settings[SETTING_KEYS.autoAcceptThreshold]) * 100)}%`}
+              hint="מעל הרף התנועה נכנסת ל״הוחלו אוטומטית״ ואפשר לאשר הכל בלחיצה. מתחתיו היא מחכה לך במיון עם ההצעה של המודל."
+            >
+              <input
+                type="range"
+                min={0.5}
+                max={1}
+                step={0.05}
+                className="accent-brand w-full"
+                defaultValue={settings[SETTING_KEYS.autoAcceptThreshold]}
+                onChange={(e) =>
+                  save.mutate({ key: SETTING_KEYS.autoAcceptThreshold, value: e.target.value })
+                }
+              />
+            </Field>
+
             <div className="flex items-center gap-3">
               <Button
                 size="sm"
@@ -178,13 +195,13 @@ export function SettingsPage() {
                 {status.reachable ? (
                   <>
                     הורד מודל כדי להפעיל סיווג אוטומטי:{' '}
-                    <code className="text-fg">ollama pull gemma3:12b</code> (או{' '}
-                    <code className="text-fg">gemma3:4b</code> על כרטיס מסך חלש יותר).
+                    <code className="text-fg">ollama pull gemma3:4b</code> (או{' '}
+                    <code className="text-fg">gemma3:12b</code> על כרטיס מסך חזק יותר).
                   </>
                 ) : (
                   <>
                     הפעל את שירות Ollama, ואז הרץ{' '}
-                    <code className="text-fg">ollama pull gemma3:12b</code>.
+                    <code className="text-fg">ollama pull gemma3:4b</code>.
                   </>
                 )}
               </p>
