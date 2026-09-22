@@ -1,4 +1,5 @@
 import { getDb } from '@/db';
+import { saveBytes } from '@/lib/saveFile';
 import { getSetting, setSetting } from './settings';
 
 const DIR = 'backups';
@@ -81,13 +82,7 @@ export async function readSnapshot(name: string): Promise<Uint8Array> {
 }
 
 export async function downloadSnapshot(name: string): Promise<void> {
-  const bytes = await readSnapshot(name);
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/vnd.sqlite3' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = name;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  await saveBytes(await readSnapshot(name), name);
 }
 
 export async function restoreSnapshot(name: string): Promise<void> {

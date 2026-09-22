@@ -2,6 +2,7 @@ import type { SqlDriver } from './driver';
 import { WebSqlDriver } from './webDriver';
 import { runMigrations } from './migrate';
 import { seedCategories } from './seed';
+import { isDesktop } from '@/lib/platform';
 
 let driver: SqlDriver | null = null;
 let initPromise: Promise<SqlDriver> | null = null;
@@ -14,7 +15,9 @@ export function getDb(): SqlDriver {
 export function initDb(): Promise<SqlDriver> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const instance = new WebSqlDriver();
+    const instance = isDesktop()
+      ? new (await import('./tauriDriver')).TauriSqlDriver()
+      : new WebSqlDriver();
     await instance.open();
     await runMigrations(instance);
     await seedCategories(instance);

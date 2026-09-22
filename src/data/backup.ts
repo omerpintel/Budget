@@ -1,4 +1,5 @@
 import { getDb } from '@/db';
+import { saveBytes } from '@/lib/saveFile';
 import { setSetting, SETTING_KEYS } from './settings';
 
 export async function downloadBackup(): Promise<string> {
@@ -6,13 +7,7 @@ export async function downloadBackup(): Promise<string> {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
   const fileName = `budget-backup-${stamp}.sqlite3`;
 
-  const blob = new Blob([bytes as BlobPart], { type: 'application/vnd.sqlite3' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  if (!await saveBytes(bytes, fileName)) return '';
 
   await setSetting(SETTING_KEYS.lastBackupAt, new Date().toISOString());
   return fileName;

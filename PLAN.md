@@ -69,14 +69,38 @@ M2 import (Israeli adapters, mapping wizard, dedupe, **historical backfill mode*
 M3 normalizer+rules engine+manual entry+recurring templates |
 M4 Ollama categorizer | M5 Triage UI (joint/personal sweep, auto-accept >=0.9) |
 M6 wallets + period engine + transfers + shortfall dialog |
-M7 dashboard + Monthly Run wizard | M8 insights | M9 polish/packaging.
+M7 dashboard + Monthly Run wizard | M8 insights | M9 polish/packaging | M10 Tauri desktop shell.
 
 ## Status
-**M0-M9 (polish) IMPLEMENTED AND VERIFIED. App feature-complete in the browser.**
-ONLY REMAINING WORK: **Tauri desktop shell — BLOCKED, Rust still not installed** (checked again
-2026-09-14: rustc/cargo/link.exe all missing). Everything else from the brief is done.
-VS2022 Community already has the "Desktop development with C++" workload (Microsoft.VisualStudio.Workload.NativeDesktop) — confirmed via vswhere, so only Rust itself is needed.
-GitHub repo: https://github.com/omerpintel/Budget.git (pushed 2026-09-14, initial commit `7310d97`).
+**M0-M10 IMPLEMENTED. App runs both in the browser and as a native desktop window.**
+VS2022 Community already has the "Desktop development with C++" workload (verified via vswhere).
+Rust 1.98.1 (stable-x86_64-pc-windows-msvc) installed.
+GitHub repo: https://github.com/omerpintel/Budget.git
+
+### M10 desktop facts
+- `src-tauri/` is a Tauri v2 shell. `npm run desktop` = `tauri dev`, `npm run desktop:build` = installer.
+- **`src-tauri/src/db.rs` implements the SqlDriver contract natively with rusqlite (bundled SQLite).**
+  Commands: db_open/db_select/db_execute/db_batch/db_export/db_import/db_close.
+  `db_execute` falls back to `execute_batch` when there are no params, because migrations ship
+  multi-statement DDL that rusqlite's `execute` refuses.
+  `db_batch` uses `unchecked_transaction()` so it only needs `&Connection`.
+  `db_export` uses **VACUUM INTO** a temp file — a consistent copy even with a live WAL.
+  `db_import` stages the new file and only then closes/renames, so a failed write cannot destroy
+  the live ledger; it also deletes the stale `-wal`/`-shm` siblings.
+- Blobs cross IPC as arrays of byte values; export returns raw bytes via `tauri::ipc::Response`,
+  import receives raw bytes via `tauri::ipc::Request`.
+- `src/db/tauriDriver.ts` + `src/lib/platform.ts` (`isDesktop()` checks `__TAURI_INTERNALS__`).
+  `initDb()` dynamically imports the Tauri driver so the web bundle never pulls it in.
+- `src/lib/saveFile.ts` — native save dialog on desktop, anchor download in the browser.
+  Used by both `downloadBackup` and `downloadSnapshot`.
+- DB lives at `%APPDATA%\com.omerpintel.budget\budget.sqlite3` (WAL mode, foreign_keys ON).
+- **CSP must include `ipc:` and `http://ipc.localhost`** in connect-src or every IPC call is blocked.
+  Kept in sync between `index.html` and `tauri.conf.json`.
+- **Vite's watcher must ignore `**/src-tauri/**`** — it crawls `target/` and dies with EBUSY on
+  locked build DLLs, which kills `beforeDevCommand`.
+- **cargo could not reach crates.io** through the corporate TLS proxy (schannel
+  CRYPT_E_NO_REVOCATION_CHECK). Fixed with `[http] check-revoke = false` in `~/.cargo/config.toml`.
+- OPFS snapshots still work inside WebView2, so the rolling auto-backups are unchanged on desktop.
 
 ### M9 polish facts
 - `components/ErrorBoundary.tsx` wraps every route. Fallback offers **Export database** before
@@ -223,8 +247,8 @@ what the M5 triage sweep exists to catch.
   formatter injects RTL control marks, do NOT use it.
 - SQLite = `@sqlite.org/sqlite-wasm` in a Comlink worker (`src/db/sqlite.worker.ts`) using
   **OPFS SAHPool VFS** (no COOP/COEP needed). Console warns about the *other* OPFS VFS — harmless.
-- `SqlDriver` interface (`src/db/driver.ts`) is the Tauri swap point. `WebSqlDriver` is the only impl.
-- Rust NOT installed. Tauri shell deferred; app runs via `npm run dev` (port 5273).
+- `SqlDriver` interface (`src/db/driver.ts`) is the Tauri swap point. `WebSqlDriver` and
+  `TauriSqlDriver` both implement it.
 - **Ollama IS running** on localhost:11434 (GUI service; CLI not on PATH) with **0 models pulled**.
 - npm 11 blocks postinstall scripts: `npm install-scripts approve esbuild` needed after wiping node_modules.
 - Route mode: `createHashRouter`.

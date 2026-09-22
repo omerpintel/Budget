@@ -11,5 +11,13 @@ export default defineConfig({
   // sqlite-wasm ships its own .wasm loader; pre-bundling breaks the asset URL resolution.
   optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
   worker: { format: 'es' },
-  server: { port: 5273 },
+  server: {
+    port: 5273,
+    strictPort: true,
+    // Rust build artifacts hold file locks the watcher cannot open.
+    watch: { ignored: ['**/src-tauri/**'] },
+  },
+  // Tauri serves the bundle from a custom protocol; relative asset URLs keep working there.
+  base: './',
+  envPrefix: ['VITE_', 'TAURI_ENV_'],
 });
