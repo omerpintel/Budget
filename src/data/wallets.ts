@@ -39,16 +39,15 @@ export async function setOpeningBalance(id: string, openingBalance: number): Pro
 }
 
 /**
- * Current balance = seeded opening + every committed period's delta + transfers.
- * Transfers are counted separately because they can happen in a draft period.
+ * Current balance = seeded opening + every period's ledger delta. Transfers are not
+ * added again here: `computePeriod` already folds transfer in/out into each wallet's
+ * ledger delta, so summing `wallet_transfers` on top would double-count them.
  */
 export async function getWalletBalances(): Promise<Map<string, number>> {
   const rows = await getDb().select<{ wallet_id: string; balance: number }>(
     `SELECT w.id AS wallet_id,
             w.opening_balance
               + COALESCE((SELECT SUM(l.delta) FROM wallet_ledger l WHERE l.wallet_id = w.id), 0)
-              + COALESCE((SELECT SUM(t.amount) FROM wallet_transfers t WHERE t.to_wallet_id = w.id), 0)
-              - COALESCE((SELECT SUM(t.amount) FROM wallet_transfers t WHERE t.from_wallet_id = w.id), 0)
             AS balance
      FROM wallets w`,
   );

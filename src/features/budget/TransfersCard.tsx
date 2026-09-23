@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Trash2 } from 'lucide-react';
+import { ArrowRight, TriangleAlert, Trash2 } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Field, MoneyInput, Select } from '@/components/ui/Field';
 import { addTransfer, listTransfers, removeTransfer } from '@/data/periodEngine';
-import { listWallets } from '@/data/wallets';
+import { getWalletBalances, listWallets } from '@/data/wallets';
 import { listPeople } from '@/data/people';
 import { formatAgorot, parseMoneyInput } from '@/lib/money';
 
@@ -24,17 +24,18 @@ export function TransfersCard({
   const { data } = useQuery({
     queryKey: ['transfers-card', periodId],
     queryFn: async () => {
-      const [wallets, people, transfers] = await Promise.all([
+      const [wallets, people, transfers, balances] = await Promise.all([
         listWallets(),
         listPeople(),
         listTransfers(periodId),
+        getWalletBalances(),
       ]);
-      return { wallets, people, transfers };
+      return { wallets, people, transfers, balances };
     },
   });
 
   if (!data) return null;
-  const { wallets, people, transfers } = data;
+  const { wallets, people, transfers, balances } = data;
 
   const label = (id: string) => {
     const w = wallets.find((x) => x.id === id);
@@ -42,9 +43,14 @@ export function TransfersCard({
     if (w.kind !== 'personal') return w.name;
     return `הארנק של ${people.find((p) => p.id === w.person_id)?.name ?? ''}`.trim();
   };
+  const labelWithBalance = (id: string) => `${label(id)} · ${formatAgorot(balances.get(id) ?? 0)}`;
 
   const source = from || wallets[0]?.id || '';
   const target = to || wallets[1]?.id || '';
+  const amount = parseMoneyInput(amountRaw) ?? 0;
+  const sourceWallet = wallets.find((w) => w.id === source);
+  const wouldGoNegative =
+    sourceWallet?.kind !== 'joint_buffer' && amount > 0 && (balances.get(source) ?? 0) - amount < 0;
   const invalidate = () => qc.invalidateQueries();
 
   return (
@@ -91,7 +97,7 @@ export function TransfersCard({
             <Select value={source} disabled={disabled} onChange={(e) => setFrom(e.target.value)}>
               {wallets.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {label(w.id)}
+                  {labelWithBalance(w.id)}
                 </option>
               ))}
             </Select>
@@ -101,7 +107,7 @@ export function TransfersCard({
             <Select value={target} disabled={disabled} onChange={(e) => setTo(e.target.value)}>
               {wallets.map((w) => (
                 <option key={w.id} value={w.id}>
-                  {label(w.id)}
+                  {labelWithBalance(w.id)}
                 </option>
               ))}
             </Select>
@@ -114,13 +120,13 @@ export function TransfersCard({
             />
           </Field>
           <Button
-            disabled={disabled || source === target || (parseMoneyInput(amountRaw) ?? 0) <= 0}
+            disabled={disabled || source === target || amount <= 0}
             onClick={async () => {
               await addTransfer({
                 periodId,
                 fromWalletId: source,
                 toWalletId: target,
-                amount: parseMoneyInput(amountRaw) ?? 0,
+                amount,
                 reason: null,
               });
               setAmountRaw('');
@@ -130,6 +136,13 @@ export function TransfersCard({
             העבר
           </Button>
         </div>
+
+        {wouldGoNegative && (
+          <p className="text-negative flex items-center gap-1.5 text-xs">
+            <TriangleAlert className="size-3.5 shrink-0" /> {label(source)} ילך למינוס
+            ({formatAgorot((balances.get(source) ?? 0) - amount, { signed: true })}).
+          </p>
+        )}
       </CardBody>
     </Card>
   );

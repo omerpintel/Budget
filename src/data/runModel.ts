@@ -3,6 +3,8 @@ export interface RunStatus {
   importedBatches: number;
   unreviewed: number;
   committed: boolean;
+  /** True when the plan assigns more than income + joint buffer carryover. */
+  overAllocated: boolean;
 }
 
 export const RUN_STEPS = [
@@ -38,7 +40,7 @@ export function isStepComplete(status: RunStatus, step: number): boolean {
     case 2:
       return status.importedBatches > 0 && status.unreviewed === 0;
     case 3:
-      return status.importedBatches > 0 && status.unreviewed === 0;
+      return status.importedBatches > 0 && status.unreviewed === 0 && !status.overAllocated;
     case 4:
       return status.committed;
     default:

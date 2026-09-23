@@ -136,7 +136,14 @@ export function MonthlyRunPage() {
       {step === 1 && <ImportStep periodId={period.id} />}
       {step === 2 && <TriageStep periodId={period.id} unreviewed={status.unreviewed} />}
       {step === 3 && <AllocationPlanner periodId={period.id} disabled={status.committed} />}
-      {step === 4 && <ReconcileStep periodId={period.id} committed={status.committed} onChanged={invalidate} />}
+      {step === 4 && (
+        <ReconcileStep
+          periodId={period.id}
+          committed={status.committed}
+          overAllocated={status.overAllocated}
+          onChanged={invalidate}
+        />
+      )}
 
       <div className="mt-5 flex items-center justify-between">
         <Button
@@ -147,7 +154,11 @@ export function MonthlyRunPage() {
           <ArrowLeft className="dir-icon size-4" /> חזרה
         </Button>
         {step < RUN_STEPS.length - 1 && (
-          <Button onClick={() => setManualStep(Math.min(step + 1, RUN_STEPS.length - 1))}>
+          <Button
+            onClick={() => setManualStep(Math.min(step + 1, RUN_STEPS.length - 1))}
+            disabled={step === 3 && status.overAllocated}
+            title={step === 3 && status.overAllocated ? 'התקציב שויך יותר ממה שיש. אזן אותו לפני שממשיכים.' : undefined}
+          >
             המשך <ArrowRight className="dir-icon size-4" />
           </Button>
         )}
@@ -442,10 +453,12 @@ function TriageStep({ periodId, unreviewed }: { periodId: string; unreviewed: nu
 function ReconcileStep({
   periodId,
   committed,
+  overAllocated,
   onChanged,
 }: {
   periodId: string;
   committed: boolean;
+  overAllocated: boolean;
   onChanged: () => void;
 }) {
   const [carried, setCarried] = useState(false);
@@ -481,6 +494,12 @@ function ReconcileStep({
 
   return (
     <div className="space-y-4">
+      {overAllocated && (
+        <div className="border-negative/40 bg-negative/10 text-negative rounded-lg border p-3 text-xs">
+          התכנון בשלב שיוך משייך יותר ממה שיש בפועל. אי אפשר לנעול את החודש עד שזה מתאזן — חזור
+          לשלב שיוך ותקן.
+        </div>
+      )}
       <div className="grid grid-cols-4 gap-3">
         <WalletCard
           name="משותף"
@@ -548,6 +567,8 @@ function ReconcileStep({
             ) : (
               <Button
                 size="sm"
+                disabled={overAllocated}
+                title={overAllocated ? 'התקציב שויך יותר ממה שיש. חזור לשיוך ואזן אותו קודם.' : undefined}
                 onClick={async () => {
                   await commitPeriod(periodId);
                   onChanged();

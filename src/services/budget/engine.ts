@@ -141,17 +141,19 @@ export interface PlanLine {
 
 /**
  * Zero-based check: every shekel of income must be given a job, whether that is a
- * category, someone's allowance, or savings.
+ * category, someone's allowance, or savings. `carryover` folds in cash already
+ * sitting in the joint buffer from previous months, which is real spendable money.
  */
 export function leftToAssign(
   income: number,
   lines: PlanLine[],
   allowances: Record<string, number>,
+  carryover = 0,
 ): number {
   const assigned =
     lines.reduce((sum, l) => sum + l.planned, 0) +
     Object.values(allowances).reduce((sum, a) => sum + a, 0);
-  return income - assigned;
+  return income + carryover - assigned;
 }
 
 export interface CategoryVariance {
@@ -242,4 +244,30 @@ export function computeVariance(
     const actual = actuals[categoryId] ?? 0;
     return { categoryId, planned, actual, delta: planned - actual };
   });
+}
+
+/**
+ * Moves planned money between two categories without touching the unassigned pool.
+ * Clamped to what the source actually has, so a category can never go negative and
+ * the total planned amount is always conserved.
+ */
+export function moveBetweenCategories(
+  lines: PlanLine[],
+  fromCategoryId: string,
+  toCategoryId: string,
+  amount: number,
+): PlanLine[] {
+  if (fromCategoryId === toCategoryId || amount <= 0) return [];
+
+  const from = lines.find((l) => l.categoryId === fromCategoryId);
+  const to = lines.find((l) => l.categoryId === toCategoryId);
+  if (!from) return [];
+
+  const moved = Math.min(amount, from.planned);
+  if (moved <= 0) return [];
+
+  return [
+    { categoryId: fromCategoryId, planned: from.planned - moved },
+    { categoryId: toCategoryId, planned: (to?.planned ?? 0) + moved },
+  ];
 }

@@ -1,5 +1,6 @@
 import { getDb } from '@/db';
 import { nowIso, uuid } from '@/lib/utils';
+import { leftToAssign, type PlanLine } from '@/services/budget/engine';
 
 export interface BudgetLineRow {
   id: string;
@@ -34,6 +35,64 @@ export async function listAllocationLines(periodId: string): Promise<BudgetLineR
      ORDER BY c.kind, c.sort_order, c.name`,
     [periodId],
   );
+}
+
+export interface AvailableToAssign {
+  income: number;
+  /** Cash already sitting in the joint buffer from previous months. */
+  carryover: number;
+  /** income + carryover — the true zero-based pool. */
+  pool: number;
+  assigned: number;
+  left: number;
+}
+
+/**
+ * The real number to check zero-based planning against: this month's income plus
+ * whatever the joint buffer is already carrying, minus everything already planned.
+ */
+export async function availableToAssign(periodId: string): Promise<AvailableToAssign> {
+  const db = getDb();
+  const period = (
+    await db.select<{ year: number; month: number }>(
+      'SELECT year, month FROM budget_periods WHERE id = ?',
+      [periodId],
+    )
+  )[0];
+  if (!period) throw new Error('Period not found');
+
+  const [incomes, lines, allowanceRows, previousClosing, jointWallet] = await Promise.all([
+    listIncomes(periodId),
+    listBudgetLines(periodId),
+    listPersonalBudgets(periodId),
+    db.select<{ closing: number }>(
+      `SELECT l.closing
+       FROM wallet_ledger l
+       JOIN wallets w ON w.id = l.wallet_id
+       JOIN budget_periods p ON p.id = l.period_id
+       WHERE w.kind = 'joint_buffer' AND (p.year * 12 + p.month) < (? * 12 + ?)
+       ORDER BY (p.year * 12 + p.month) DESC
+       LIMIT 1`,
+      [period.year, period.month],
+    ),
+    db.select<{ opening_balance: number }>(`SELECT opening_balance FROM wallets WHERE kind = 'joint_buffer'`),
+  ]);
+
+  const income = incomes.reduce((s, i) => s + i.amount, 0);
+  const carryover = previousClosing[0]?.closing ?? jointWallet[0]?.opening_balance ?? 0;
+
+  const planLines: PlanLine[] = lines.map((l) => ({ categoryId: l.category_id, planned: l.planned_amount }));
+  const allowances = Object.fromEntries(allowanceRows.map((a) => [a.person_id, a.allowance]));
+  const assigned =
+    planLines.reduce((s, l) => s + l.planned, 0) + Object.values(allowances).reduce((s, a) => s + a, 0);
+
+  return {
+    income,
+    carryover,
+    pool: income + carryover,
+    assigned,
+    left: leftToAssign(income, planLines, allowances, carryover),
+  };
 }
 
 export async function setBudgetLine(

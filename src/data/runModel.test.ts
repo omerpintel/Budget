@@ -6,6 +6,7 @@ const status = (partial: Partial<RunStatus> = {}): RunStatus => ({
   importedBatches: 0,
   unreviewed: 0,
   committed: false,
+  overAllocated: false,
   ...partial,
 });
 
@@ -56,5 +57,11 @@ describe('isStepComplete', () => {
   it('opens allocation once triage is clear, without needing a commit', () => {
     expect(isStepComplete(status({ importedBatches: 1, unreviewed: 0 }), 3)).toBe(true);
     expect(isStepComplete(status({ importedBatches: 1, unreviewed: 4 }), 3)).toBe(false);
+  });
+
+  it('does not call allocation complete while over-allocated', () => {
+    expect(
+      isStepComplete(status({ importedBatches: 1, unreviewed: 0, overAllocated: true }), 3),
+    ).toBe(false);
   });
 });
