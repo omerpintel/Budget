@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   computePeriod,
   computeVariance,
+  coverDeficits,
   leftToAssign,
+  moveBetweenCategories,
   nextOpening,
+  spreadByWeight,
   type PeriodInput,
   type PeriodResult,
+  type PlanLine,
 } from './engine';
 
 /** Deterministic PRNG so a failing property test is reproducible. */
@@ -307,5 +311,171 @@ describe('variance', () => {
   it('includes categories that were spent but never planned', () => {
     const v = computeVariance([], { surprise: 50_000 });
     expect(v).toEqual([{ categoryId: 'surprise', planned: 0, actual: 50_000, delta: -50_000 }]);
+  });
+});
+
+describe('coverDeficits', () => {
+  it('closes the smallest gaps first, exhausting whatever pot is available', () => {
+    const targets = [
+      { id: 'a', planned: 100, actual: 150 }, // gap 50
+      { id: 'b', planned: 100, actual: 130 }, // gap 30
+      { id: 'c', planned: 100, actual: 100 }, // no gap
+    ];
+    const step = coverDeficits(targets, 60);
+    expect(step.assignments).toEqual({ b: 30, a: 30 });
+    expect(step.used).toBe(60);
+  });
+
+  it('fully closes every gap when the pot is large enough', () => {
+    const targets = [
+      { id: 'a', planned: 0, actual: 20 },
+      { id: 'b', planned: 0, actual: 10 },
+    ];
+    const step = coverDeficits(targets, 1000);
+    expect(step.assignments).toEqual({ b: 10, a: 20 });
+    expect(step.used).toBe(30);
+  });
+
+  it('ignores categories with no deficit and treats a negative pot as zero', () => {
+    const targets = [{ id: 'a', planned: 200, actual: 100 }];
+    expect(coverDeficits(targets, 50)).toEqual({ assignments: {}, used: 0 });
+    expect(coverDeficits(targets, -100)).toEqual({ assignments: {}, used: 0 });
+  });
+
+  it('handles an empty target list', () => {
+    expect(coverDeficits([], 500)).toEqual({ assignments: {}, used: 0 });
+  });
+});
+
+describe('spreadByWeight', () => {
+  it('splits proportionally to weight, remainder landing on the heaviest target', () => {
+    const result = spreadByWeight(
+      [
+        { id: 'a', weight: 2 },
+        { id: 'b', weight: 1 },
+      ],
+      100,
+    );
+    // 100 * 2/3 = 66.67 -> floor 66; 100 * 1/3 = 33.33 -> floor 33; remainder 1 -> heaviest (a)
+    expect(result.a + result.b).toBe(100);
+    expect(result.a).toBe(67);
+    expect(result.b).toBe(33);
+  });
+
+  it('falls back to an even split when every weight is zero, remainder still lands correctly', () => {
+    const result = spreadByWeight(
+      [
+        { id: 'a', weight: 0 },
+        { id: 'b', weight: 0 },
+        { id: 'c', weight: 0 },
+      ],
+      100,
+    );
+    expect(Object.values(result).reduce((s, v) => s + v, 0)).toBe(100);
+    expect(result.a).toBe(34); // first target absorbs the remainder in an even split
+    expect(result.b).toBe(33);
+    expect(result.c).toBe(33);
+  });
+
+  it('treats negative weights as zero without letting them skew the split', () => {
+    const result = spreadByWeight(
+      [
+        { id: 'a', weight: -5 },
+        { id: 'b', weight: 5 },
+      ],
+      100,
+    );
+    expect(result.a).toBe(0);
+    expect(result.b).toBe(100);
+  });
+
+  it('returns nothing for zero, negative, or empty-target amounts', () => {
+    expect(spreadByWeight([{ id: 'a', weight: 1 }], 0)).toEqual({});
+    expect(spreadByWeight([{ id: 'a', weight: 1 }], -50)).toEqual({});
+    expect(spreadByWeight([], 100)).toEqual({});
+  });
+
+  it('exactly reconstructs a very large amount with no drift', () => {
+    const result = spreadByWeight(
+      [
+        { id: 'a', weight: 7 },
+        { id: 'b', weight: 11 },
+        { id: 'c', weight: 3 },
+      ],
+      2_147_483_647, // > 2^31 agorot
+    );
+    expect(Object.values(result).reduce((s, v) => s + v, 0)).toBe(2_147_483_647);
+  });
+});
+
+describe('moveBetweenCategories', () => {
+  const lines: PlanLine[] = [
+    { categoryId: 'a', planned: 500 },
+    { categoryId: 'b', planned: 100 },
+  ];
+
+  it('moves the requested amount and conserves the total', () => {
+    const result = moveBetweenCategories(lines, 'a', 'b', 200);
+    expect(result).toEqual([
+      { categoryId: 'a', planned: 300 },
+      { categoryId: 'b', planned: 300 },
+    ]);
+  });
+
+  it('clamps to the source planned amount so it can never go negative', () => {
+    const result = moveBetweenCategories(lines, 'a', 'b', 10_000);
+    expect(result).toEqual([
+      { categoryId: 'a', planned: 0 },
+      { categoryId: 'b', planned: 600 },
+    ]);
+  });
+
+  it('creates the destination line at the moved amount when it did not exist yet', () => {
+    const result = moveBetweenCategories(lines, 'a', 'new-category', 100);
+    expect(result).toEqual([
+      { categoryId: 'a', planned: 400 },
+      { categoryId: 'new-category', planned: 100 },
+    ]);
+  });
+
+  it('is a no-op for a self-move, a non-positive amount, or an unknown source', () => {
+    expect(moveBetweenCategories(lines, 'a', 'a', 100)).toEqual([]);
+    expect(moveBetweenCategories(lines, 'a', 'b', 0)).toEqual([]);
+    expect(moveBetweenCategories(lines, 'a', 'b', -50)).toEqual([]);
+    expect(moveBetweenCategories(lines, 'unknown', 'b', 100)).toEqual([]);
+  });
+
+  it('is a no-op when the source has nothing planned', () => {
+    const zeroed: PlanLine[] = [{ categoryId: 'a', planned: 0 }, { categoryId: 'b', planned: 100 }];
+    expect(moveBetweenCategories(zeroed, 'a', 'b', 50)).toEqual([]);
+  });
+});
+
+describe('money edge cases', () => {
+  it('leftToAssign handles a zero-income, all-zero plan as exactly balanced', () => {
+    expect(leftToAssign(0, [], {})).toBe(0);
+  });
+
+  it('leftToAssign handles very large amounts (> 2^31 agorot) without overflow drift', () => {
+    const big = 3_000_000_000; // exceeds a signed 32-bit int
+    expect(leftToAssign(big, [{ categoryId: 'a', planned: big - 1 }], {})).toBe(1);
+  });
+
+  it('computePeriod stays exact at the boundary of exactly-zero and one-agora-over available', () => {
+    const input: PeriodInput = {
+      opening: { joint: 0, savings: 0, personal: {} },
+      actual: { income: 100, fixed: 0, jointFlexible: 0, personalSpent: {}, savingsFunded: 0 },
+      plan: { allowances: {}, savings: 0 },
+      transfers: [],
+    };
+    expect(computePeriod(input).joint.closing).toBe(100);
+    expect(computePeriod(input).shortfall).toBe(0);
+
+    const overByOne: PeriodInput = {
+      ...input,
+      actual: { ...input.actual, fixed: 101 },
+    };
+    expect(computePeriod(overByOne).joint.closing).toBe(-1);
+    expect(computePeriod(overByOne).shortfall).toBe(1);
   });
 });
