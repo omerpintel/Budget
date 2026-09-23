@@ -10,6 +10,7 @@ import { ManualEntryForm, type ManualDraft } from '@/features/transactions/Manua
 import { listTransactions, createManualTransaction, deleteTransaction } from '@/data/transactions';
 import { listCategories } from '@/data/categories';
 import { listPeople } from '@/data/people';
+import { listWallets } from '@/data/wallets';
 import { findPeriod, periodForDebitDate, ensurePeriod } from '@/data/periods';
 import { ensureManualAccount } from '@/data/accounts';
 import { applyCorrection, categorizePending } from '@/services/categorize/apply';
@@ -41,21 +42,23 @@ export function TransactionsPage() {
   const { data } = useQuery({
     queryKey: ['ledger', periodId, reveal],
     queryFn: async () => {
-      const [rows, categories, people, unresolved] = await Promise.all([
+      const [rows, categories, people, unresolved, wallets] = await Promise.all([
         listTransactions({ periodId: periodId || null, reveal }),
         listCategories(),
         listPeople(),
         countUnresolved({ periodId: periodId || null }),
+        listWallets(),
       ]);
-      return { rows, categories, people, unresolved };
+      return { rows, categories, people, unresolved, wallets };
     },
   });
+
+  const savingsWalletId = data?.wallets.find((w) => w.kind === 'savings')?.id ?? null;
 
   const correct = useMutation({
     mutationFn: applyCorrection,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ledger'] }),
   });
-
   const remove = useMutation({
     mutationFn: deleteTransaction,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ledger'] }),
@@ -101,6 +104,7 @@ export function TransactionsPage() {
         wallet: draft.wallet,
         personId: draft.wallet === 'personal' ? draft.personId : null,
         note: draft.note || null,
+        fundingWalletId: draft.fundFromSavings ? savingsWalletId : null,
       });
     },
     onSuccess: () => {
@@ -208,6 +212,7 @@ export function TransactionsPage() {
           <ManualEntryForm
             categories={categories}
             people={people}
+            canFundFromSavings={savingsWalletId !== null}
             onCancel={() => setAdding(false)}
             onSubmit={async (draft) => {
               await addManual.mutateAsync(draft);

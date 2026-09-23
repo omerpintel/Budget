@@ -74,6 +74,8 @@ export interface ManualTransactionInput {
   wallet: WalletScope;
   personId: string | null;
   note: string | null;
+  /** Savings wallet id when the expense is drawn from the buffer instead of the joint pot. */
+  fundingWalletId?: string | null;
 }
 
 export async function createManualTransaction(input: ManualTransactionInput): Promise<string> {
@@ -86,9 +88,9 @@ export async function createManualTransaction(input: ManualTransactionInput): Pr
     `INSERT INTO transactions
        (id, period_id, account_id, entry_mode, direction, transaction_date, debit_date,
         amount, raw_description, normalized_merchant, category_id, wallet, personal_person_id,
-        is_masked, categorization_source, is_reviewed, is_excluded, note, dedupe_hash,
-        created_at, updated_at)
-     VALUES (?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 1, 0, ?, ?, ?, ?)`,
+        is_masked, categorization_source, is_reviewed, is_excluded, funding_wallet_id, note,
+        dedupe_hash, created_at, updated_at)
+     VALUES (?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user', 1, 0, ?, ?, ?, ?, ?)`,
     [
       id,
       input.periodId,
@@ -103,6 +105,7 @@ export async function createManualTransaction(input: ManualTransactionInput): Pr
       input.wallet,
       isPersonal ? input.personId : null,
       isPersonal ? 1 : 0,
+      input.fundingWalletId ?? null,
       input.note,
       `manual:${id}`,
       ts,
@@ -110,6 +113,14 @@ export async function createManualTransaction(input: ManualTransactionInput): Pr
     ],
   );
   return id;
+}
+
+/** Drawing an expense from savings keeps it out of the joint flexible total. */
+export async function setFundingWallet(id: string, walletId: string | null): Promise<void> {
+  await getDb().execute(
+    'UPDATE transactions SET funding_wallet_id = ?, updated_at = ? WHERE id = ?',
+    [walletId, nowIso(), id],
+  );
 }
 
 export async function deleteTransaction(id: string): Promise<void> {

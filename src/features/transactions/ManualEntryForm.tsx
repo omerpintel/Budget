@@ -14,6 +14,7 @@ export interface ManualDraft {
   wallet: WalletScope;
   personId: string;
   note: string;
+  fundFromSavings: boolean;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -21,11 +22,13 @@ const today = () => new Date().toISOString().slice(0, 10);
 export function ManualEntryForm({
   categories,
   people,
+  canFundFromSavings = false,
   onSubmit,
   onCancel,
 }: {
   categories: Category[];
   people: Person[];
+  canFundFromSavings?: boolean;
   onSubmit: (draft: ManualDraft) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -38,6 +41,7 @@ export function ManualEntryForm({
     wallet: 'joint',
     personId: people[0]?.id ?? '',
     note: '',
+    fundFromSavings: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -114,6 +118,17 @@ export function ManualEntryForm({
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-1">
+          {canFundFromSavings && draft.direction === 'out' && (
+            <label className="text-fg-muted me-auto flex cursor-pointer items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="accent-savings size-3.5"
+                checked={draft.fundFromSavings}
+                onChange={(e) => set('fundFromSavings', e.target.checked)}
+              />
+              לשלם מכרית החיסכון — יורד מהחיסכון ולא מהכרית המשותפת
+            </label>
+          )}
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
             ביטול
           </Button>

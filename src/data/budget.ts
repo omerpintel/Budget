@@ -1,7 +1,7 @@
 import { getDb } from '@/db';
 import { nowIso, uuid } from '@/lib/utils';
 import { leftToAssign, type PlanLine } from '@/services/budget/engine';
-import { loadActuals } from './periodEngine';
+import { addTransfer, loadActuals } from './periodEngine';
 
 export interface BudgetLineRow {
   id: string;
@@ -42,7 +42,9 @@ export interface AvailableToAssign {
   income: number;
   /** Cash already sitting in the joint buffer from previous months. */
   carryover: number;
-  /** income + carryover — the true zero-based pool. */
+  transfersIn: number;
+  transfersOut: number;
+  /** income + carryover + net transfers — the true zero-based pool. */
   pool: number;
   assigned: number;
   left: number;
@@ -51,6 +53,7 @@ export interface AvailableToAssign {
 /**
  * The real number to check zero-based planning against: this month's income plus
  * whatever the joint buffer is already carrying, minus everything already planned.
+ * Transfers count too — money pulled in from savings is genuinely there to assign.
  */
 export async function availableToAssign(periodId: string): Promise<AvailableToAssign> {
   const db = getDb();
@@ -62,25 +65,42 @@ export async function availableToAssign(periodId: string): Promise<AvailableToAs
   )[0];
   if (!period) throw new Error('Period not found');
 
-  const [incomes, lines, allowanceRows, previousClosing, jointWallet] = await Promise.all([
-    listIncomes(periodId),
-    listBudgetLines(periodId),
-    listPersonalBudgets(periodId),
-    db.select<{ closing: number }>(
-      `SELECT l.closing
+  const [incomes, lines, allowanceRows, previousClosing, jointWallet, transferRows] =
+    await Promise.all([
+      listIncomes(periodId),
+      listBudgetLines(periodId),
+      listPersonalBudgets(periodId),
+      db.select<{ closing: number }>(
+        `SELECT l.closing
        FROM wallet_ledger l
        JOIN wallets w ON w.id = l.wallet_id
        JOIN budget_periods p ON p.id = l.period_id
        WHERE w.kind = 'joint_buffer' AND (p.year * 12 + p.month) < (? * 12 + ?)
        ORDER BY (p.year * 12 + p.month) DESC
        LIMIT 1`,
-      [period.year, period.month],
-    ),
-    db.select<{ opening_balance: number }>(`SELECT opening_balance FROM wallets WHERE kind = 'joint_buffer'`),
-  ]);
+        [period.year, period.month],
+      ),
+      db.select<{ opening_balance: number }>(
+        `SELECT opening_balance FROM wallets WHERE kind = 'joint_buffer'`,
+      ),
+      db.select<{ direction: string; amount: number }>(
+        `SELECT CASE WHEN f.kind = 'joint_buffer' THEN 'out' ELSE 'in' END AS direction, t.amount
+       FROM wallet_transfers t
+       LEFT JOIN wallets f ON f.id = t.from_wallet_id
+       LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
+       WHERE t.period_id = ? AND (f.kind = 'joint_buffer' OR tw.kind = 'joint_buffer')`,
+        [periodId],
+      ),
+    ]);
 
   const income = incomes.reduce((s, i) => s + i.amount, 0);
   const carryover = previousClosing[0]?.closing ?? jointWallet[0]?.opening_balance ?? 0;
+  const transfersIn = transferRows
+    .filter((t) => t.direction === 'in')
+    .reduce((s, t) => s + t.amount, 0);
+  const transfersOut = transferRows
+    .filter((t) => t.direction === 'out')
+    .reduce((s, t) => s + t.amount, 0);
 
   const planLines: PlanLine[] = lines.map((l) => ({ categoryId: l.category_id, planned: l.planned_amount }));
   const allowances = Object.fromEntries(allowanceRows.map((a) => [a.person_id, a.allowance]));
@@ -90,9 +110,11 @@ export async function availableToAssign(periodId: string): Promise<AvailableToAs
   return {
     income,
     carryover,
-    pool: income + carryover,
+    transfersIn,
+    transfersOut,
+    pool: income + carryover + transfersIn - transfersOut,
     assigned,
-    left: leftToAssign(income, planLines, allowances, carryover),
+    left: leftToAssign(income, planLines, allowances, carryover + transfersIn - transfersOut),
   };
 }
 
@@ -306,6 +328,8 @@ export interface PeriodReconciliation extends AvailableToAssign {
   transfersOut: number;
   /** Everything that left the joint pot this month, plan-independent. */
   jointOutflow: number;
+  /** Joint money still sitting inside category plans: sum of planned minus actual. */
+  categoryRemainder: number;
   /** Joint spending no plan line covers yet. Zero means the month adds up. */
   unassignedActual: number;
   /** Joint spending still without a category, so it cannot be assigned at all. */
@@ -320,7 +344,7 @@ export interface PeriodReconciliation extends AvailableToAssign {
  */
 export async function reconcilePeriod(periodId: string): Promise<PeriodReconciliation> {
   const db = getDb();
-  const [available, actuals, allowanceRows, ledger, transferRows] = await Promise.all([
+  const [available, actuals, allowanceRows, ledger, lines] = await Promise.all([
     availableToAssign(periodId),
     loadActuals(periodId),
     listPersonalBudgets(periodId),
@@ -330,28 +354,21 @@ export async function reconcilePeriod(periodId: string): Promise<PeriodReconcili
        WHERE l.period_id = ? AND w.kind = 'joint_buffer'`,
       [periodId],
     ),
-    db.select<{ direction: string; amount: number }>(
-      `SELECT CASE WHEN f.kind = 'joint_buffer' THEN 'out' ELSE 'in' END AS direction, t.amount
-       FROM wallet_transfers t
-       LEFT JOIN wallets f ON f.id = t.from_wallet_id
-       LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
-       WHERE t.period_id = ? AND (f.kind = 'joint_buffer' OR tw.kind = 'joint_buffer')`,
-      [periodId],
-    ),
+    listBudgetLines(periodId),
   ]);
 
-  const transfersIn = transferRows
-    .filter((t) => t.direction === 'in')
-    .reduce((s, t) => s + t.amount, 0);
-  const transfersOut = transferRows
-    .filter((t) => t.direction === 'out')
-    .reduce((s, t) => s + t.amount, 0);
-
+  const { transfersIn, transfersOut } = available;
   const allowanceTotal = allowanceRows.reduce((s, a) => s + a.allowance, 0);
-  const plannedSavings = (await listBudgetLines(periodId))
+  const plannedSavings = lines
     .filter((l) => l.kind === 'savings')
     .reduce((s, l) => s + l.planned_amount, 0);
   const savingsMoved = actuals.savingsContribution || plannedSavings;
+
+  // What each category still holds. Savings lines are excluded: a contribution
+  // leaves the joint pot the moment it is planned, so it is not held anywhere.
+  const categoryRemainder = lines
+    .filter((l) => l.kind !== 'savings')
+    .reduce((sum, l) => sum + l.planned_amount - (actuals.byCategory[l.category_id] ?? 0), 0);
 
   const jointOutflow = actuals.fixed + actuals.jointFlexible + savingsMoved + allowanceTotal;
   const jointClosing =
@@ -364,8 +381,60 @@ export async function reconcilePeriod(periodId: string): Promise<PeriodReconcili
     transfersIn,
     transfersOut,
     jointOutflow,
+    categoryRemainder,
     unassignedActual: jointOutflow - available.assigned,
     uncategorized: actuals.uncategorized,
     balanced: jointOutflow - available.assigned === 0,
   };
+}
+
+/**
+ * Parks last month's leftover inside a category. Until it is given one it shows up
+ * as "not assigned to anything", which is the only part of the joint balance that
+ * belongs to no category.
+ */
+export async function assignCarryoverTo(periodId: string, categoryId: string): Promise<number> {
+  const available = await availableToAssign(periodId);
+  if (available.carryover === 0) return 0;
+
+  const current =
+    (await listBudgetLines(periodId)).find((l) => l.category_id === categoryId)?.planned_amount ?? 0;
+  await setBudgetLine(periodId, categoryId, current + available.carryover);
+  return available.carryover;
+}
+
+/**
+ * Pays for a category out of the savings buffer. The money really moves — savings
+ * drops, the joint pot rises — so the category can be funded without the joint
+ * balance pretending the shortfall never happened.
+ */
+export async function fundCategoryFromSavings(
+  periodId: string,
+  categoryId: string,
+  amount: number,
+): Promise<void> {
+  if (amount <= 0) return;
+  const db = getDb();
+  const wallets = await db.select<{ id: string; kind: string }>(
+    `SELECT id, kind FROM wallets WHERE kind IN ('savings', 'joint_buffer')`,
+  );
+  const savings = wallets.find((w) => w.kind === 'savings');
+  const joint = wallets.find((w) => w.kind === 'joint_buffer');
+  if (!savings || !joint) throw new Error('Savings or joint wallet missing');
+
+  const name =
+    (
+      await db.select<{ name: string }>('SELECT name FROM categories WHERE id = ?', [categoryId])
+    )[0]?.name ?? '';
+
+  const current =
+    (await listBudgetLines(periodId)).find((l) => l.category_id === categoryId)?.planned_amount ?? 0;
+  await setBudgetLine(periodId, categoryId, current + amount);
+  await addTransfer({
+    periodId,
+    fromWalletId: savings.id,
+    toWalletId: joint.id,
+    amount,
+    reason: `מימון ${name} מהחיסכון`,
+  });
 }

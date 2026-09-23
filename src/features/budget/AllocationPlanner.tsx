@@ -13,7 +13,9 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { MoneyInput, Select } from '@/components/ui/Field';
 import {
+  assignCarryoverTo,
   averageSpendByCategory,
+  fundCategoryFromSavings,
   listAllocationLines,
   listIncomes,
   listPersonalBudgets,
@@ -52,6 +54,7 @@ export function AllocationPlanner({
   const [moveTo, setMoveTo] = useState('');
   const [moveAmountRaw, setMoveAmountRaw] = useState('');
   const [coverSource, setCoverSource] = useState<Record<string, string>>({});
+  const [carryoverTarget, setCarryoverTarget] = useState('');
 
   const { data } = useQuery({
     queryKey: ['allocation', periodId],
@@ -234,15 +237,64 @@ export function AllocationPlanner({
       />
       <CardBody className="space-y-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Summary label="הכנסות החודש" value={income} />
-          <Summary label="יתרה מהחודש שעבר" value={carryover} />
-          <Summary label="שויך" value={plannedTotal} />
           <Summary
-            label={unassigned < 0 ? 'שויך יותר מדי' : 'נותר לשייך'}
+            label="זמין לשיוך"
+            value={available.pool}
+            caption={
+              carryover !== 0
+                ? `${formatAgorot(income)} הכנסות + ${formatAgorot(carryover)} מהחודש שעבר`
+                : 'הכנסות החודש'
+            }
+          />
+          <Summary label="שויך לקטגוריות" value={plannedTotal} />
+          <Summary
+            label={unassigned < 0 ? 'שויך יותר מדי' : 'לא שייך לאף קטגוריה'}
             value={unassigned}
             tone={unassigned === 0 ? 'good' : unassigned > 0 ? 'neutral' : 'bad'}
           />
+          <Summary
+            label="יתרת משותף"
+            value={available.jointClosing}
+            caption={`${formatAgorot(available.categoryRemainder)} בקטגוריות + ${formatAgorot(
+              unassigned,
+            )} חופשי`}
+          />
         </div>
+
+        {carryover !== 0 && unassigned !== 0 && (
+          <div className="border-line bg-surface-2/40 flex flex-wrap items-end gap-2 rounded-lg border p-3">
+            <div className="text-fg-muted me-auto text-xs">
+              נשארו {formatAgorot(carryover)} מהחודש שעבר שלא שייכים לאף קטגוריה. תן להם סעיף כדי
+              שלא ישבו סתם בכרית.
+            </div>
+            <Select
+              className="h-7 w-44 text-xs"
+              value={carryoverTarget}
+              disabled={disabled}
+              onChange={(e) => setCarryoverTarget(e.target.value)}
+            >
+              <option value="">— בחר קטגוריה —</option>
+              {lines.map((l) => (
+                <option key={l.category_id} value={l.category_id}>
+                  {l.category_name}
+                </option>
+              ))}
+            </Select>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={disabled || !carryoverTarget}
+              onClick={async () => {
+                const moved = await assignCarryoverTo(periodId, carryoverTarget);
+                setCarryoverTarget('');
+                setNote(`${formatAgorot(moved)} מהחודש שעבר שויכו`);
+                await invalidate();
+              }}
+            >
+              שייך את היתרה
+            </Button>
+          </div>
+        )}
 
         <ReconcileBanner
           left={unassigned}
@@ -437,33 +489,50 @@ export function AllocationPlanner({
                           {formatAgorot(left)}
                         </td>
                         <td className="py-1.5">
-                          {left < 0 && surplusOptions.length > 0 && (
+                          {left < 0 && (
                             <div className="flex items-center gap-1">
-                              <Select
-                                className="h-7 text-xs"
-                                disabled={disabled}
-                                value={coverSource[line.category_id] ?? ''}
-                                onChange={(e) =>
-                                  setCoverSource((prev) => ({
-                                    ...prev,
-                                    [line.category_id]: e.target.value,
-                                  }))
-                                }
-                              >
-                                <option value="">— בחר —</option>
-                                {surplusOptions.map((o) => (
-                                  <option key={o.category_id} value={o.category_id}>
-                                    {o.category_name}
-                                  </option>
-                                ))}
-                              </Select>
+                              {surplusOptions.length > 0 && (
+                                <>
+                                  <Select
+                                    className="h-7 text-xs"
+                                    disabled={disabled}
+                                    value={coverSource[line.category_id] ?? ''}
+                                    onChange={(e) =>
+                                      setCoverSource((prev) => ({
+                                        ...prev,
+                                        [line.category_id]: e.target.value,
+                                      }))
+                                    }
+                                  >
+                                    <option value="">— בחר —</option>
+                                    {surplusOptions.map((o) => (
+                                      <option key={o.category_id} value={o.category_id}>
+                                        {o.category_name}
+                                      </option>
+                                    ))}
+                                  </Select>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={disabled || !coverSource[line.category_id]}
+                                    onClick={() => coverFromCategory(line.category_id, -left)}
+                                  >
+                                    כסה
+                                  </Button>
+                                </>
+                              )}
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                disabled={disabled || !coverSource[line.category_id]}
-                                onClick={() => coverFromCategory(line.category_id, -left)}
+                                disabled={disabled}
+                                title="מעביר את החסר מכרית החיסכון לכרית המשותפת"
+                                onClick={async () => {
+                                  await fundCategoryFromSavings(periodId, line.category_id, -left);
+                                  setNote(`${formatAgorot(-left)} מומנו מהחיסכון`);
+                                  await invalidate();
+                                }}
                               >
-                                כסה
+                                <PiggyBank className="size-3.5" /> מהחיסכון
                               </Button>
                             </div>
                           )}
@@ -525,10 +594,12 @@ export function AllocationPlanner({
 function Summary({
   label,
   value,
+  caption,
   tone = 'neutral',
 }: {
   label: string;
   value: number;
+  caption?: string;
   tone?: 'neutral' | 'good' | 'bad';
 }) {
   return (
@@ -544,6 +615,7 @@ function Summary({
     >
       <div className="text-fg-subtle text-[11px]">{label}</div>
       <div className="tnum mt-0.5 text-sm font-semibold">{formatAgorot(value)}</div>
+      {caption ? <div className="text-fg-subtle mt-0.5 text-[10px]">{caption}</div> : null}
     </div>
   );
 }

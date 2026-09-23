@@ -8,7 +8,9 @@ import {
   seedHousehold,
 } from '@/test/factories';
 import { listBudgetLines, reconcilePeriod, seedPlanFromActuals, setBudgetLine } from './budget';
+import { assignCarryoverTo, fundCategoryFromSavings } from './budget';
 import { loadActuals, recomputeFrom } from './periodEngine';
+import { getWalletBalances, listWallets } from './wallets';
 
 describe('loadActuals bucketing', () => {
   useTestDb();
@@ -103,6 +105,28 @@ describe('loadActuals bucketing', () => {
     const actuals = await loadActuals(period.id);
     expect(actuals.uncategorized).toBe(30_000);
     expect(actuals.jointFlexible).toBe(30_000);
+  });
+
+  it('keeps a savings-funded expense out of joint spending', async () => {
+    const { wallets } = await seedHousehold({ savingsOpening: 500_000 });
+    const period = await makePeriod({ year: 2026, month: 1 });
+    const home = await findCategory('home');
+    const savings = wallets.find((w) => w.kind === 'savings')!;
+
+    await makeTransaction({
+      periodId: period.id,
+      amount: 200_000,
+      categoryId: home.id,
+      fundingWalletId: savings.id,
+    });
+
+    const actuals = await loadActuals(period.id);
+    expect(actuals.savingsFunded).toBe(200_000);
+    expect(actuals.jointFlexible).toBe(0);
+
+    const result = await recomputeFrom(period.id);
+    expect(result.savings.closing).toBe(300_000);
+    expect(result.joint.closing).toBe(0);
   });
 });
 
@@ -213,5 +237,75 @@ describe('reconcilePeriod', () => {
     expect(after.balanced).toBe(true);
     expect(after.left).toBe(after.jointClosing);
     expect(after.left).toBe(937_200);
+  });
+
+  it('splits the joint balance into what sits in categories and what sits nowhere', async () => {
+    await seedHousehold();
+    const period = await makePeriod({ year: 2026, month: 1 });
+    const groceries = await findCategory('groceries');
+
+    await makeIncome(period.id, 1_000_000);
+    await setBudgetLine(period.id, groceries.id, 300_000);
+    await makeTransaction({ periodId: period.id, amount: 120_000, categoryId: groceries.id });
+    await recomputeFrom(period.id);
+
+    const r = await reconcilePeriod(period.id);
+    // 180,000 still held by groceries, 700,000 given no category at all.
+    expect(r.categoryRemainder).toBe(180_000);
+    expect(r.left).toBe(700_000);
+    expect(r.categoryRemainder + r.left).toBe(r.jointClosing);
+  });
+});
+
+describe('assignCarryoverTo', () => {
+  useTestDb();
+
+  it('moves last month’s leftover into a category so nothing sits outside one', async () => {
+    await seedHousehold();
+    const january = await makePeriod({ year: 2026, month: 1 });
+    await makeIncome(january.id, 500_000);
+    await recomputeFrom(january.id);
+
+    const february = await makePeriod({ year: 2026, month: 2 });
+    const misc = await findCategory('misc');
+    const before = await reconcilePeriod(february.id);
+    expect(before.carryover).toBe(500_000);
+    expect(before.left).toBe(500_000);
+
+    const moved = await assignCarryoverTo(february.id, misc.id);
+    expect(moved).toBe(500_000);
+
+    await recomputeFrom(february.id);
+    const after = await reconcilePeriod(february.id);
+    expect(after.left).toBe(0);
+    expect(after.categoryRemainder).toBe(500_000);
+    expect(after.categoryRemainder + after.left).toBe(after.jointClosing);
+  });
+});
+
+describe('fundCategoryFromSavings', () => {
+  useTestDb();
+
+  it('moves real money out of savings and raises the category plan', async () => {
+    await seedHousehold({ savingsOpening: 1_000_000 });
+    const period = await makePeriod({ year: 2026, month: 1 });
+    const rent = await findCategory('rent');
+
+    await makeIncome(period.id, 200_000);
+    await makeTransaction({ periodId: period.id, amount: 500_000, categoryId: rent.id });
+    await fundCategoryFromSavings(period.id, rent.id, 500_000);
+
+    const lines = await listBudgetLines(period.id);
+    expect(lines.find((l) => l.category_id === rent.id)?.planned_amount).toBe(500_000);
+
+    const wallets = await listWallets();
+    const balances = await getWalletBalances();
+    const savings = wallets.find((w) => w.kind === 'savings')!;
+    expect(balances.get(savings.id)).toBe(500_000);
+
+    // The rent is now paid for, so nothing is left unassigned and the month adds up.
+    const r = await reconcilePeriod(period.id);
+    expect(r.balanced).toBe(true);
+    expect(r.categoryRemainder + r.left).toBe(r.jointClosing);
   });
 });
