@@ -12,6 +12,12 @@ export function getDb(): SqlDriver {
   return driver;
 }
 
+/** Test-only escape hatch: inject a driver directly, bypassing platform detection. */
+export function setDbForTests(instance: SqlDriver | null): void {
+  driver = instance;
+  initPromise = instance ? Promise.resolve(instance) : null;
+}
+
 export function initDb(): Promise<SqlDriver> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
