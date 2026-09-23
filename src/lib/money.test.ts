@@ -32,6 +32,15 @@ describe('money', () => {
     expect(stripBidi(formatAgorot(0, { signed: true }))).toBe('₪0');
   });
 
+  it('never signs an amount that rounds away to zero', () => {
+    // A few agorot left over must not read as a deficit.
+    expect(stripBidi(formatAgorot(-20))).toBe('₪0');
+    expect(stripBidi(formatAgorot(-49, { signed: true }))).toBe('₪0');
+    expect(stripBidi(formatAgorot(20))).toBe('₪0');
+    // Precision still decides: the same amount is signed when agorot are shown.
+    expect(stripBidi(formatAgorot(-20, { precise: true }))).toBe('−₪0.20');
+  });
+
   it('parses user input with separators and currency noise', () => {
     expect(parseMoneyInput('₪12,500')).toBe(1_250_000);
     expect(parseMoneyInput('48000')).toBe(4_800_000);

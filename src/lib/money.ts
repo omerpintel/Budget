@@ -33,11 +33,13 @@ export function toMajor(agorot: number): number {
 }
 
 export function formatAgorot(agorot: number, opts?: { precise?: boolean; signed?: boolean }): string {
-  const value = toMajor(agorot);
   const fmt = opts?.precise ? GROUPED_PRECISE : GROUPED;
-  const text = `₪${fmt.format(Math.abs(value))}`;
-  if (opts?.signed && agorot !== 0) return `${LRI}${agorot > 0 ? '+' : '−'}${text}${PDI}`;
-  return agorot < 0 ? `${LRI}−${text}${PDI}` : `${LRI}${text}${PDI}`;
+  const text = `₪${fmt.format(Math.abs(toMajor(agorot)))}`;
+  // Amounts under the displayed precision format as "0"; signing those would
+  // print "−₪0", which reads as a deficit when there is nothing there.
+  if (!/[1-9]/.test(text)) return `${LRI}${text}${PDI}`;
+  if (agorot < 0) return `${LRI}−${text}${PDI}`;
+  return `${LRI}${opts?.signed ? '+' : ''}${text}${PDI}`;
 }
 
 export function parseMoneyInput(raw: string): number | null {

@@ -147,6 +147,32 @@ describe('seedPlanFromActuals', () => {
     expect(lines.filter((l) => l.category_id === rent.id)).toHaveLength(1);
     expect(lines.find((l) => l.category_id === rent.id)?.planned_amount).toBe(520_000);
   });
+
+  it('balances a category whose refund exceeded its spend', async () => {
+    await seedHousehold();
+    const period = await makePeriod({ year: 2026, month: 1 });
+    const groceries = await findCategory('groceries');
+
+    await makeIncome(period.id, 1_000_000);
+    await makeTransaction({ periodId: period.id, amount: 10_000, categoryId: groceries.id });
+    await makeTransaction({
+      periodId: period.id,
+      amount: 25_000,
+      categoryId: groceries.id,
+      direction: 'in',
+      description: 'זיכוי גדול',
+    });
+    await seedPlanFromActuals(period.id);
+    await recomputeFrom(period.id);
+
+    const lines = await listBudgetLines(period.id);
+    expect(lines.find((l) => l.category_id === groceries.id)?.planned_amount).toBe(-15_000);
+
+    // Without a negative plan line the remainder could never be cleared.
+    const after = await reconcilePeriod(period.id);
+    expect(after.unassignedActual).toBe(0);
+    expect(after.balanced).toBe(true);
+  });
 });
 
 describe('reconcilePeriod', () => {

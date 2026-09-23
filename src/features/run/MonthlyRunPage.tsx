@@ -32,7 +32,6 @@ import { listImportHistory } from '@/data/imports';
 import {
   deriveStep,
   getRunStatus,
-  isStepComplete,
   listManualOutflows,
   materializeRecurring,
   RUN_STEPS,
@@ -172,7 +171,9 @@ export function MonthlyRunPage() {
         {step < RUN_STEPS.length - 1 && (
           <Button
             onClick={() => setManualStep(Math.min(step + 1, RUN_STEPS.length - 1))}
-            disabled={step === 3 && !isStepComplete(status, 3) && !status.committed}
+            // Only over-allocation blocks: an unassigned remainder is a warning the
+            // user may legitimately accept, and blocking on it created a dead end.
+            disabled={step === 3 && status.overAllocated && !status.committed}
             title={step === 3 ? allocationBlockReason(status) : undefined}
           >
             המשך <ArrowRight className="dir-icon size-4" />

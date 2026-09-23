@@ -289,7 +289,9 @@ export async function seedPlanFromActuals(periodId: string): Promise<number> {
   const amounts = Object.fromEntries(
     Object.entries(actuals.byCategory).filter(([categoryId, amount]) => {
       if (edited.has(categoryId)) return false;
-      return amount > 0;
+      // Negatives are real: a refund can exceed the month's spend. Skipping them
+      // would leave a residue no amount of pressing the button could clear.
+      return amount !== 0;
     }),
   );
 
