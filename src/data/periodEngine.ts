@@ -15,6 +15,9 @@ export interface PeriodTotals {
 /**
  * Actuals for a period. Excluded rows never count, and anything drawn from the
  * savings buffer is kept out of joint flexible so it cannot distort the month.
+ * Income is manual entry only (`period_incomes`) — imported credit transactions
+ * are not added on top, so a salary typed in the בנק step and its matching bank
+ * deposit are never double-counted.
  */
 export async function loadActuals(periodId: string): Promise<PeriodTotals> {
   const db = getDb();
@@ -54,10 +57,7 @@ export async function loadActuals(periodId: string): Promise<PeriodTotals> {
 
   for (const row of rows) {
     const amount = row.total;
-    if (row.direction === 'in') {
-      totals.income += amount;
-      continue;
-    }
+    if (row.direction === 'in') continue;
     if (row.funded_from_savings === 1) {
       totals.savingsFunded += amount;
       continue;
