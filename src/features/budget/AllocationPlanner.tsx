@@ -1,18 +1,27 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftRight, Copy, PiggyBank, Sparkles, TriangleAlert, Wand2 } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Check,
+  Copy,
+  PiggyBank,
+  Sparkles,
+  TriangleAlert,
+  Wand2,
+} from 'lucide-react';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { MoneyInput, Select } from '@/components/ui/Field';
 import {
-  availableToAssign,
   averageSpendByCategory,
   listAllocationLines,
   listIncomes,
   listPersonalBudgets,
+  reconcilePeriod,
   setAllowance,
   setBudgetLine,
   setBudgetLines,
+  seedPlanFromActuals,
   seedPlanFromPrevious,
 } from '@/data/budget';
 import { listPeople } from '@/data/people';
@@ -54,7 +63,7 @@ export function AllocationPlanner({
         listPeople(),
         loadActuals(periodId),
         averageSpendByCategory(periodId),
-        availableToAssign(periodId),
+        reconcilePeriod(periodId),
       ]);
       return { lines, incomes, allowances, people, actuals, history, available };
     },
@@ -191,21 +200,36 @@ export function AllocationPlanner({
     <Card>
       <CardHeader
         title="שיוך"
-        description="תן לכל שקל מההכנסה של החודש תפקיד. מה שלא שויך יושב בכרית המשותפת בלי ייעוד."
+        description="החודש כבר קרה — שייך כל שקל שיצא מהכרית המשותפת לסעיף שלו. כשהכל משויך, ״נותר לשייך״ שווה בדיוק ליתרה שנשארה במשותף."
         action={
-          <Button
-            size="sm"
-            variant="ghost"
-            className="shrink-0"
-            disabled={disabled}
-            onClick={async () => {
-              await seedPlanFromPrevious(periodId);
-              setNote('הועתקה התוכנית מהחודש שעבר');
-              await invalidate();
-            }}
-          >
-            <Copy className="size-3.5" /> העתק מהחודש שעבר
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={disabled}
+              onClick={async () => {
+                const filled = await seedPlanFromActuals(periodId);
+                setNote(
+                  filled > 0 ? `מולאו ${filled} סעיפים לפי ההוצאות בפועל` : 'אין מה למלא',
+                );
+                await invalidate();
+              }}
+            >
+              <Wand2 className="size-3.5" /> מלא לפי בפועל
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={disabled}
+              onClick={async () => {
+                await seedPlanFromPrevious(periodId);
+                setNote('הועתקה התוכנית מהחודש שעבר');
+                await invalidate();
+              }}
+            >
+              <Copy className="size-3.5" /> העתק מהחודש שעבר
+            </Button>
+          </div>
         }
       />
       <CardBody className="space-y-4">
@@ -219,6 +243,14 @@ export function AllocationPlanner({
             tone={unassigned === 0 ? 'good' : unassigned > 0 ? 'neutral' : 'bad'}
           />
         </div>
+
+        <ReconcileBanner
+          left={unassigned}
+          jointClosing={available.jointClosing}
+          unassignedActual={available.unassignedActual}
+          uncategorized={available.uncategorized}
+          balanced={available.balanced}
+        />
 
         {unassigned < 0 && (
           <div className="border-negative/40 bg-negative/10 text-negative rounded-lg border p-3 text-xs">
@@ -362,7 +394,24 @@ export function AllocationPlanner({
                     );
                     return (
                       <tr key={line.category_id} className="border-line/60 border-t">
-                        <td className="py-1.5">{line.category_name}</td>
+                        <td className="py-1.5">
+                          <div>{line.category_name}</div>
+                          <div className="bg-surface-2 mt-1 h-1 w-full max-w-40 overflow-hidden rounded-full">
+                            <div
+                              className={cn(
+                                'h-full rounded-full transition-[width] duration-500 ease-[var(--ease-out-soft)]',
+                                left < 0 ? 'bg-negative' : 'bg-joint',
+                              )}
+                              style={{
+                                width: `${
+                                  line.planned_amount > 0
+                                    ? Math.min((actual / line.planned_amount) * 100, 100)
+                                    : 0
+                                }%`,
+                              }}
+                            />
+                          </div>
+                        </td>
                         <td className="py-1.5">
                           <MoneyInput
                             key={`${periodId}-${line.category_id}-${line.planned_amount}`}
@@ -495,6 +544,68 @@ function Summary({
     >
       <div className="text-fg-subtle text-[11px]">{label}</div>
       <div className="tnum mt-0.5 text-sm font-semibold">{formatAgorot(value)}</div>
+    </div>
+  );
+}
+
+/**
+ * The שיוך screen and the משותף wallet describe the same money from two angles:
+ * what you gave a job to, and what is physically left. When every shekel that left
+ * the joint pot has a line, the two numbers meet. Showing the gap is the only way
+ * to notice that a month was "balanced" purely because nothing was assigned yet.
+ */
+function ReconcileBanner({
+  left,
+  jointClosing,
+  unassignedActual,
+  uncategorized,
+  balanced,
+}: {
+  left: number;
+  jointClosing: number;
+  unassignedActual: number;
+  uncategorized: number;
+  balanced: boolean;
+}) {
+  if (balanced && uncategorized === 0) {
+    return (
+      <div className="border-positive/40 bg-positive/10 text-positive flex items-center gap-2 rounded-lg border p-3 text-xs">
+        <Check className="size-4 shrink-0" />
+        <span>
+          הכל משויך. נותר לשייך <b className="tnum">{formatAgorot(left)}</b> — בדיוק היתרה שנשארה
+          בכרית המשותפת <b className="tnum">{formatAgorot(jointClosing)}</b>.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-warning/40 bg-warning/10 space-y-1.5 rounded-lg border p-3 text-xs">
+      <div className="flex items-center gap-2 font-medium">
+        <TriangleAlert className="text-warning size-4 shrink-0" />
+        <span>
+          ״נותר לשייך״ <b className="tnum">{formatAgorot(left)}</b> לא מסתדר עם היתרה במשותף{' '}
+          <b className="tnum">{formatAgorot(jointClosing)}</b>.
+        </span>
+      </div>
+      {unassignedActual > 0 && (
+        <p className="text-fg-muted">
+          יצאו מהכרית המשותפת <b className="tnum">{formatAgorot(unassignedActual)}</b> שאין להם עדיין
+          סעיף. לחץ ״מלא לפי בפועל״ והשניים ישתוו.
+        </p>
+      )}
+      {unassignedActual < 0 && (
+        <p className="text-fg-muted">
+          שויכו <b className="tnum">{formatAgorot(-unassignedActual)}</b> יותר ממה שבאמת יצא. הקטן
+          סעיפים שלא נוצלו.
+        </p>
+      )}
+      {uncategorized > 0 && (
+        <p className="text-fg-muted">
+          <b className="tnum">{formatAgorot(uncategorized)}</b> בהוצאות עדיין בלי קטגוריה. חזור לשלב
+          המיון — בלי זה אי אפשר לשייך אותן לשום סעיף.
+        </p>
+      )}
     </div>
   );
 }

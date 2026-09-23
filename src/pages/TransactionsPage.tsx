@@ -150,13 +150,13 @@ export function TransactionsPage() {
       />
 
       <div className="mb-4 flex items-center gap-3">
-        <div className="border-line inline-flex rounded-lg border p-0.5">
+        <div className="border-line bg-surface-2/50 inline-flex rounded-[var(--radius-pill)] border p-1">
           <button
             type="button"
             onClick={() => setAllMonths(false)}
             className={cn(
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-              allMonths ? 'text-fg-muted hover:text-fg' : 'bg-surface-2 text-fg',
+              'rounded-[var(--radius-pill)] px-3 py-1 text-xs font-medium transition-colors',
+              allMonths ? 'text-fg-muted hover:text-fg' : 'bg-surface text-fg shadow-e1',
             )}
           >
             {periodLabel(ref.year, ref.month)}
@@ -165,8 +165,8 @@ export function TransactionsPage() {
             type="button"
             onClick={() => setAllMonths(true)}
             className={cn(
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-              allMonths ? 'bg-surface-2 text-fg' : 'text-fg-muted hover:text-fg',
+              'rounded-[var(--radius-pill)] px-3 py-1 text-xs font-medium transition-colors',
+              allMonths ? 'bg-surface text-fg shadow-e1' : 'text-fg-muted hover:text-fg',
             )}
           >
             כל החודשים
@@ -223,9 +223,9 @@ export function TransactionsPage() {
             description="ייבא דף חיוב, או הוסף רשומה ידנית לשכר דירה ולתנועות בנק אחרות."
           />
         ) : (
-          <CardBody className="overflow-x-auto p-0">
-            <table className="w-full min-w-[42rem] text-xs">
-              <thead className="bg-surface-2 text-fg-subtle">
+          <CardBody className="max-h-[calc(100vh-18rem)] overflow-auto p-0">
+            <table className="w-full min-w-[36rem] text-xs">
+              <thead className="bg-surface-2 text-fg-subtle border-line sticky top-0 z-10 border-b">
                 <tr className="text-start">
                   <th className="w-24 px-3 py-2.5 font-medium">תאריך</th>
                   <th className="px-3 py-2.5 font-medium">בית עסק</th>

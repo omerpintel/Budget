@@ -2,9 +2,10 @@ import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type Selec
 import { cn } from '@/lib/utils';
 
 const fieldBase =
-  'w-full h-10 rounded-lg bg-surface-2 border border-line-strong px-3 text-sm text-fg ' +
-  'placeholder:text-fg-subtle transition-colors hover:border-fg-subtle ' +
-  'focus:border-brand focus:outline-none disabled:opacity-40';
+  'w-full h-10 rounded-[var(--radius-field)] bg-surface-2 border border-line px-3 text-sm text-fg ' +
+  'placeholder:text-fg-subtle transition-[border-color,box-shadow,background-color] duration-150 ' +
+  'hover:border-line-strong focus:border-brand focus:bg-surface focus:outline-none ' +
+  'focus:ring-2 focus:ring-brand/25 disabled:opacity-40 disabled:pointer-events-none';
 
 export function Field({
   label,
@@ -28,7 +29,7 @@ export function Field({
       </label>
       {children}
       {error ? (
-        <p className="text-negative text-xs">{error}</p>
+        <p className="text-negative anim-rise text-xs">{error}</p>
       ) : hint ? (
         <p className="text-fg-subtle text-xs leading-relaxed">{hint}</p>
       ) : null}

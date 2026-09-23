@@ -53,3 +53,30 @@ export async function getWalletBalances(): Promise<Map<string, number>> {
   );
   return new Map(rows.map((r) => [r.wallet_id, r.balance]));
 }
+
+export interface WalletTrendPoint {
+  walletId: string;
+  year: number;
+  month: number;
+  closing: number;
+}
+
+/** Closing balance per wallet for the months up to and including `ref`, oldest first. */
+export async function getWalletTrends(
+  ref: { year: number; month: number },
+  months = 6,
+): Promise<WalletTrendPoint[]> {
+  const rows = await getDb().select<WalletTrendPoint>(
+    `SELECT l.wallet_id AS walletId, p.year, p.month, l.closing
+     FROM wallet_ledger l
+     JOIN budget_periods p ON p.id = l.period_id
+     WHERE (p.year * 12 + p.month) <= (? * 12 + ?)
+     ORDER BY (p.year * 12 + p.month) DESC`,
+    [ref.year, ref.month],
+  );
+
+  const keep = new Set(
+    [...new Set(rows.map((r) => r.year * 12 + r.month))].slice(0, months),
+  );
+  return rows.filter((r) => keep.has(r.year * 12 + r.month)).reverse();
+}

@@ -8,6 +8,10 @@ export interface PeriodTotals {
   fixed: number;
   jointFlexible: number;
   savingsFunded: number;
+  /** Real money moved into the savings buffer this month. */
+  savingsContribution: number;
+  /** Joint spending with no category yet — already inside `jointFlexible`. */
+  uncategorized: number;
   personalSpent: Record<string, number>;
   byCategory: Record<string, number>;
 }
@@ -18,6 +22,10 @@ export interface PeriodTotals {
  * Income is manual entry only (`period_incomes`) — imported credit transactions
  * are not added on top, so a salary typed in the בנק step and its matching bank
  * deposit are never double-counted.
+ *
+ * Credits other than salary (refunds, chargebacks) are netted back against the
+ * bucket they came from, and `transfer` categories are ignored entirely because
+ * moving your own money between accounts is not spending.
  */
 export async function loadActuals(periodId: string): Promise<PeriodTotals> {
   const db = getDb();
@@ -51,13 +59,21 @@ export async function loadActuals(periodId: string): Promise<PeriodTotals> {
     fixed: 0,
     jointFlexible: 0,
     savingsFunded: 0,
+    savingsContribution: 0,
+    uncategorized: 0,
     personalSpent: {},
     byCategory: {},
   };
 
   for (const row of rows) {
-    const amount = row.total;
-    if (row.direction === 'in') continue;
+    // Moving money between your own accounts is not spending, in either direction.
+    if (row.kind === 'transfer') continue;
+    // Salary is typed manually in the בנק step; counting the deposit too would double it.
+    if (row.direction === 'in' && row.kind === 'income') continue;
+
+    // A credit is a refund: it gives back to whichever bucket originally paid.
+    const amount = row.direction === 'in' ? -row.total : row.total;
+
     if (row.funded_from_savings === 1) {
       totals.savingsFunded += amount;
       continue;
@@ -67,9 +83,17 @@ export async function loadActuals(periodId: string): Promise<PeriodTotals> {
         (totals.personalSpent[row.personal_person_id] ?? 0) + amount;
       continue;
     }
-    if (row.kind === 'fixed') totals.fixed += amount;
-    else totals.jointFlexible += amount;
+    if (row.kind === 'savings') {
+      totals.savingsContribution += amount;
+    } else if (row.kind === 'fixed') {
+      totals.fixed += amount;
+    } else {
+      totals.jointFlexible += amount;
+      if (!row.kind) totals.uncategorized += amount;
+    }
 
+    // Only rows that actually leave the joint pot, so a plan built from these
+    // totals adds back up to the joint wallet's movement exactly.
     if (row.category_id) {
       totals.byCategory[row.category_id] = (totals.byCategory[row.category_id] ?? 0) + amount;
     }
@@ -168,6 +192,7 @@ export async function buildPeriodInput(
       jointFlexible: actuals.jointFlexible,
       personalSpent: actuals.personalSpent,
       savingsFunded: actuals.savingsFunded,
+      savingsContribution: actuals.savingsContribution,
     },
     plan: { allowances: plan.allowances, savings: plan.savings },
     transfers,

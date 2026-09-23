@@ -5,6 +5,10 @@ export interface RunStatus {
   committed: boolean;
   /** True when the plan assigns more than income + joint buffer carryover. */
   overAllocated: boolean;
+  /** Joint spending that no plan line covers yet. */
+  unassignedActual: number;
+  /** Joint spending still without a category, so it cannot be assigned at all. */
+  uncategorized: number;
 }
 
 export const RUN_STEPS = [
@@ -40,7 +44,12 @@ export function isStepComplete(status: RunStatus, step: number): boolean {
     case 2:
       return status.importedBatches > 0 && status.unreviewed === 0;
     case 3:
-      return status.importedBatches > 0 && status.unreviewed === 0 && !status.overAllocated;
+      return (
+        status.importedBatches > 0 &&
+        status.unreviewed === 0 &&
+        !status.overAllocated &&
+        status.unassignedActual === 0
+      );
     case 4:
       return status.committed;
     default:

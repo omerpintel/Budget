@@ -27,6 +27,8 @@ export interface PeriodInput {
     personalSpent: Record<string, number>;
     /** Big expenses explicitly drawn from the savings buffer. */
     savingsFunded: number;
+    /** Real transfers into savings. Overrides `plan.savings` when present. */
+    savingsContribution?: number;
   };
   plan: {
     /** Funded to each person regardless of what they actually spend. */
@@ -86,6 +88,11 @@ export function computePeriod(input: PeriodInput): PeriodResult {
     0,
   );
 
+  // A real transfer into savings is the truth; the plan number is only a stand-in
+  // for months where that transfer has not been made or imported yet. Using both
+  // would charge the joint pot twice for the same shekels.
+  const savingsMoved = input.actual.savingsContribution || input.plan.savings;
+
   // Allowances and the savings contribution leave the joint pot the moment the
   // period is planned, whether or not they are spent. That is what makes personal
   // money genuinely guilt-free.
@@ -95,13 +102,13 @@ export function computePeriod(input: PeriodInput): PeriodResult {
     input.actual.fixed +
       input.actual.jointFlexible +
       allowanceTotal +
-      input.plan.savings +
+      savingsMoved +
       outOf('joint'),
   );
 
   const savings = movement(
     input.opening.savings,
-    input.plan.savings + inOf('savings'),
+    savingsMoved + inOf('savings'),
     input.actual.savingsFunded + outOf('savings'),
   );
 

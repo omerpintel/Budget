@@ -1,7 +1,7 @@
 import { getDb } from '@/db';
 import { nowIso, uuid } from '@/lib/utils';
 import { ensureManualAccount } from './accounts';
-import { availableToAssign } from './budget';
+import { reconcilePeriod } from './budget';
 import { normalizeMerchant } from '@/services/categorize/normalize';
 import type { RunStatus } from './runModel';
 
@@ -24,13 +24,15 @@ export async function getRunStatus(periodId: string): Promise<RunStatus> {
     [periodId, periodId, periodId, periodId],
   );
   const row = rows[0];
-  const available = await availableToAssign(periodId);
+  const reconciliation = await reconcilePeriod(periodId);
   return {
     hasIncome: row.incomes > 0,
     importedBatches: row.batches,
     unreviewed: row.unreviewed,
     committed: row.committed === 1,
-    overAllocated: available.left < 0,
+    overAllocated: reconciliation.left < 0,
+    unassignedActual: reconciliation.unassignedActual,
+    uncategorized: reconciliation.uncategorized,
   };
 }
 

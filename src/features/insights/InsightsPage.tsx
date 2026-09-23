@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { PageHeader, EmptyState } from '@/components/ui/Feedback';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { CategorySpendChart } from './CategorySpendChart';
 import { MerchantText } from '@/components/MerchantText';
 import { findPeriod } from '@/data/periods';
 import { buildInsights, getDismissedSubscriptions, setSubscriptionDismissed } from '@/data/insights';
@@ -211,7 +212,19 @@ export function InsightsPage() {
                 אין חריגות — כל קטגוריה קרובה לממוצע שלה.
               </p>
             ) : (
-              data.anomalies.map((anomaly) => <AnomalyRow key={anomaly.categoryId} anomaly={anomaly} />)
+              <>
+                <CategorySpendChart
+                  data={data.anomalies.map((a) => ({
+                    name: a.categoryName,
+                    planned: a.average,
+                    actual: a.current,
+                  }))}
+                  height={180}
+                />
+                {data.anomalies.map((anomaly) => (
+                  <AnomalyRow key={anomaly.categoryId} anomaly={anomaly} />
+                ))}
+              </>
             )}
           </CardBody>
         </Card>

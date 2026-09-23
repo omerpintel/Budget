@@ -123,6 +123,85 @@ describe('computePeriod invariants', () => {
     const r = computePeriod(baseInput({ transfers: [{ from: 'savings', to: 'joint', amount: 0 }] }));
     expect(r).toEqual(computePeriod(baseInput()));
   });
+
+  it('charges a real savings transfer once, not on top of the planned one', () => {
+    const planned = computePeriod(baseInput());
+    const actual = computePeriod(
+      baseInput({
+        actual: { ...baseInput().actual, savingsContribution: 200_000 },
+        plan: { allowances: { [OMER]: 100_000, [RONI]: 100_000 }, savings: 200_000 },
+      }),
+    );
+    expect(actual.joint.closing).toBe(planned.joint.closing);
+    expect(actual.savings.closing).toBe(planned.savings.closing);
+  });
+
+  it('lets the real savings transfer override a stale plan number', () => {
+    const r = computePeriod(
+      baseInput({
+        actual: { ...baseInput().actual, savingsContribution: 500_000 },
+        plan: { allowances: { [OMER]: 0, [RONI]: 0 }, savings: 200_000 },
+      }),
+    );
+    expect(r.savings.inflow).toBe(500_000);
+  });
+});
+
+/**
+ * The bug this guards: שיוך counted only planned amounts while the משותף wallet
+ * counted only actuals, so a month where nothing had been assigned yet reported
+ * the entire income as "left to assign" even though the cash was long gone.
+ */
+describe('שיוך reconciles with the משותף wallet', () => {
+  it('leaves exactly the joint closing balance once every actual has a plan line', () => {
+    const random = rng(20260923);
+    for (let i = 0; i < 200; i++) {
+      const amount = () => Math.round(random() * 500_000);
+      const fixed = amount();
+      const jointFlexible = amount();
+      const savings = amount();
+      const allowances = { [OMER]: amount(), [RONI]: amount() };
+      const input = baseInput({
+        opening: { joint: amount(), savings: amount(), personal: { [OMER]: 0, [RONI]: 0 } },
+        actual: {
+          income: amount(),
+          fixed,
+          jointFlexible,
+          personalSpent: { [OMER]: amount(), [RONI]: amount() },
+          savingsFunded: 0,
+        },
+        plan: { allowances, savings },
+        transfers: [],
+      });
+
+      const lines: PlanLine[] = [
+        { categoryId: 'fixed', planned: fixed },
+        { categoryId: 'flexible', planned: jointFlexible },
+        { categoryId: 'savings', planned: savings },
+      ];
+      const left = leftToAssign(input.actual.income, lines, allowances, input.opening.joint);
+
+      expect(left).toBe(computePeriod(input).joint.closing);
+    }
+  });
+
+  it('reports the whole pool as unassigned when the plan is still empty', () => {
+    const input = baseInput({
+      opening: { joint: 100, savings: 0, personal: { [OMER]: 0, [RONI]: 0 } },
+      actual: {
+        income: 2_790_700,
+        fixed: 520_000,
+        jointFlexible: 1_133_500,
+        personalSpent: { [OMER]: 0, [RONI]: 0 },
+        savingsFunded: 0,
+      },
+      plan: { allowances: { [OMER]: 100_000, [RONI]: 100_000 }, savings: 0 },
+    });
+
+    // No plan lines: left is the full pool, while the wallet already drained.
+    expect(leftToAssign(input.actual.income, [], {}, input.opening.joint)).toBe(2_790_800);
+    expect(computePeriod(input).joint.closing).toBe(937_300);
+  });
 });
 
 describe('wallet behaviour', () => {

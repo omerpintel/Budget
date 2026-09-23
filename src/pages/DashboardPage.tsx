@@ -11,12 +11,14 @@ import {
 import { PageHeader, EmptyState } from '@/components/ui/Feedback';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { WalletCard } from '@/components/WalletCard';
+import { CategorySpendChart } from '@/features/insights/CategorySpendChart';
 import { ImportHistory } from '@/features/import/ImportHistory';
-import { listWallets } from '@/data/wallets';
+import { getWalletTrends, listWallets } from '@/data/wallets';
 import { listPeople } from '@/data/people';
 import { findPeriod } from '@/data/periods';
-import { listAllocationLines } from '@/data/budget';
+import { listAllocationLines, reconcilePeriod } from '@/data/budget';
 import { buildInsights, type InsightBundle } from '@/data/insights';
 import type { Anomaly } from '@/services/insights/anomalies';
 import { loadActuals, recomputeFrom } from '@/data/periodEngine';
@@ -54,12 +56,14 @@ export function DashboardPage() {
 
       if (!current) return { wallets, people, closeDay: Number(closeDay) || 10, current: null };
 
-      const [result, lines, actuals, status, insights] = await Promise.all([
+      const [result, lines, actuals, status, insights, trends, reconciliation] = await Promise.all([
         recomputeFrom(current.id),
         listAllocationLines(current.id),
         loadActuals(current.id),
         getRunStatus(current.id),
         buildInsights(current.id),
+        getWalletTrends(ref),
+        reconcilePeriod(current.id),
       ]);
       return {
         wallets,
@@ -71,6 +75,8 @@ export function DashboardPage() {
         actuals,
         status,
         insights,
+        trends,
+        reconciliation,
       };
     },
   });
@@ -111,6 +117,14 @@ export function DashboardPage() {
   const budgeted = (lines ?? []).filter((l) => l.planned_amount > 0);
   const step = status ? deriveStep(status) : 0;
   const committed = status?.committed ?? false;
+  const trendFor = (walletId: string) =>
+    (data.trends ?? [])
+      .filter((t) => t.walletId === walletId)
+      .map((t) => ({ label: periodLabel(t.year, t.month), value: t.closing }));
+  const jointWalletId = data.wallets.find((w) => w.kind === 'joint_buffer')?.id ?? '';
+  const savingsWalletId = data.wallets.find((w) => w.kind === 'savings')?.id ?? '';
+  const personalWalletId = (personId: string) =>
+    data.wallets.find((w) => w.kind === 'personal' && w.person_id === personId)?.id ?? '';
 
   return (
     <>
@@ -139,12 +153,14 @@ export function DashboardPage() {
           kind="joint_buffer"
           balance={result.joint.closing}
           caption={`${formatAgorot(result.joint.delta, { signed: true })} החודש`}
+          trend={trendFor(jointWalletId)}
         />
         <WalletCard
           name="חיסכון"
           kind="savings"
           balance={result.savings.closing}
           caption={`${formatAgorot(result.savings.delta, { signed: true })} החודש`}
+          trend={trendFor(savingsWalletId)}
         />
         {people.map((person, i) => (
           <WalletCard
@@ -156,87 +172,40 @@ export function DashboardPage() {
             caption={`${formatAgorot(result.personal[person.id]?.delta ?? 0, {
               signed: true,
             })} החודש`}
+            trend={trendFor(personalWalletId(person.id))}
+            trendColor={i === 0 ? 'var(--omer)' : 'var(--roni)'}
           />
         ))}
       </div>
 
+      {data.reconciliation && !committed && (
+        <ReconcileStrip
+          left={data.reconciliation.left}
+          jointClosing={data.reconciliation.jointClosing}
+          unassignedActual={data.reconciliation.unassignedActual}
+          uncategorized={data.reconciliation.uncategorized}
+          balanced={data.reconciliation.balanced}
+        />
+      )}
+
       <div className="grid grid-cols-3 gap-4">
-        <Card className="col-span-2">
+        <Card className="col-span-2" variant="elevated">
           <CardHeader
-            title="כמה נשאר בכל קטגוריה"
-            description="מתוכנן מול בפועל לחודש הזה. לעריכה — שלב השיוך בסגירת החודש."
-            action={
-              <Link to="/run" className="text-brand shrink-0 text-xs hover:underline">
-                עריכת התקציב
-              </Link>
-            }
+            title="לאן הלך הכסף"
+            description="ההוצאות הגדולות של החודש. אדום = חרג מהמתוכנן."
           />
           <CardBody>
-            {budgeted.length === 0 ? (
-              <p className="text-fg-subtle text-xs">
-                עדיין לא הוקצה תקציב לחודש הזה. עבור לשלב{' '}
-                <Link to="/run" className="text-brand underline">
-                  השיוך בסגירת החודש
-                </Link>{' '}
-                כדי לחלק את ההכנסות לקטגוריות.
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {(['fixed', 'flexible', 'savings'] as const).map((kind) => {
-                  const group = budgeted.filter((l) => l.kind === kind);
-                  if (group.length === 0) return null;
-                  return (
-                    <div key={kind}>
-                      <div className="text-fg-subtle mb-2 text-[11px] font-medium">
-                        {KIND_LABELS[kind]}
-                      </div>
-                      <div className="space-y-2.5">
-                        {group.map((line) => {
-                          const actual = actuals?.byCategory[line.category_id] ?? 0;
-                          const pct =
-                            line.planned_amount > 0 ? (actual / line.planned_amount) * 100 : 0;
-                          const over = actual > line.planned_amount;
-                          const left = line.planned_amount - actual;
-                          return (
-                            <div key={line.category_id}>
-                              <div className="mb-1 flex items-baseline justify-between gap-3 text-xs">
-                                <span className="truncate">{line.category_name}</span>
-                                <span
-                                  className={cn(
-                                    'tnum shrink-0',
-                                    over ? 'text-negative' : 'text-fg-muted',
-                                  )}
-                                >
-                                  {over ? 'חריגה של ' : 'נותר '}
-                                  {formatAgorot(Math.abs(left))}
-                                  <span className="text-fg-subtle">
-                                    {' '}
-                                    · {formatAgorot(actual)} מתוך {formatAgorot(line.planned_amount)}
-                                  </span>
-                                </span>
-                              </div>
-                              <div className="bg-surface-2 h-1.5 overflow-hidden rounded-full">
-                                <div
-                                  className={cn(
-                                    'h-full rounded-full',
-                                    over ? 'bg-negative' : 'bg-joint',
-                                  )}
-                                  style={{ width: `${Math.min(pct, 100)}%` }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <CategorySpendChart
+              data={(lines ?? []).map((l) => ({
+                name: l.category_name,
+                planned: l.planned_amount,
+                actual: actuals?.byCategory[l.category_id] ?? 0,
+              }))}
+            />
           </CardBody>
         </Card>
 
-        <Card>
+        <Card variant="elevated">
           <CardHeader title="סגירת חודש" />
           <CardBody className="space-y-3">
             <div className="text-fg-subtle flex items-center gap-2 text-xs">
@@ -277,7 +246,91 @@ export function DashboardPage() {
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-4">
-        <Card className="col-span-2">
+        <Card className="col-span-2" variant="elevated">
+          <CardHeader
+            title="כמה נשאר בכל קטגוריה"
+            description="מתוכנן מול בפועל לחודש הזה. לעריכה — שלב השיוך בסגירת החודש."
+            action={
+              <Link to="/run" className="text-brand shrink-0 text-xs hover:underline">
+                עריכת התקציב
+              </Link>
+            }
+          />
+          <CardBody>
+            {budgeted.length === 0 ? (
+              <p className="text-fg-subtle text-xs">
+                עדיין לא שויך כלום לחודש הזה. עבור לשלב{' '}
+                <Link to="/run" className="text-brand underline">
+                  השיוך בסגירת החודש
+                </Link>{' '}
+                ולחץ ״מלא לפי בפועל״.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {(['fixed', 'flexible', 'savings'] as const).map((kind) => {
+                  const group = budgeted.filter((l) => l.kind === kind);
+                  if (group.length === 0) return null;
+                  return (
+                    <div key={kind}>
+                      <div className="text-fg-subtle mb-2 text-[11px] font-medium">
+                        {KIND_LABELS[kind]}
+                      </div>
+                      <div className="space-y-2.5">
+                        {group.map((line) => {
+                          const actual = actuals?.byCategory[line.category_id] ?? 0;
+                          const pct =
+                            line.planned_amount > 0 ? (actual / line.planned_amount) * 100 : 0;
+                          const over = actual > line.planned_amount;
+                          const left = line.planned_amount - actual;
+                          return (
+                            <div key={line.category_id}>
+                              <div className="mb-1 flex items-baseline justify-between gap-3 text-xs">
+                                <span className="truncate">{line.category_name}</span>
+                                <span
+                                  className={cn(
+                                    'tnum shrink-0',
+                                    over ? 'text-negative' : 'text-fg-muted',
+                                  )}
+                                >
+                                  {over ? 'חריגה של ' : 'נותר '}
+                                  {formatAgorot(Math.abs(left))}
+                                  <span className="text-fg-subtle">
+                                    {' '}
+                                    · {formatAgorot(actual)} מתוך {formatAgorot(line.planned_amount)}
+                                  </span>
+                                </span>
+                              </div>
+                              <div className="bg-surface-2 h-1.5 overflow-hidden rounded-full">
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full transition-[width] duration-500 ease-[var(--ease-out-soft)]',
+                                    over ? 'bg-negative' : 'bg-joint',
+                                  )}
+                                  style={{ width: `${Math.min(pct, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card variant="elevated">
+          <CardHeader title="העלאות החודש" />
+          <CardBody>
+            <ImportHistory periodId={current.id} compact />
+          </CardBody>
+        </Card>
+      </div>
+
+      <div className="mt-4">
+        <Card variant="elevated">
           <CardHeader
             title="שווה מבט"
             description="מנויים והוצאות חריגות שזוהו מההיסטוריה שלך."
@@ -291,15 +344,65 @@ export function DashboardPage() {
             <InsightsSummary insights={data.insights} />
           </CardBody>
         </Card>
-
-        <Card>
-          <CardHeader title="העלאות החודש" />
-          <CardBody>
-            <ImportHistory periodId={current.id} compact />
-          </CardBody>
-        </Card>
       </div>
     </>
+  );
+}
+
+/**
+ * The joint buffer is plain leftover cash, not an envelope. This strip is the only
+ * place that says so out loud, by putting the two numbers side by side.
+ */
+function ReconcileStrip({
+  left,
+  jointClosing,
+  unassignedActual,
+  uncategorized,
+  balanced,
+}: {
+  left: number;
+  jointClosing: number;
+  unassignedActual: number;
+  uncategorized: number;
+  balanced: boolean;
+}) {
+  const ok = balanced && uncategorized === 0;
+  return (
+    <Card
+      tone={ok ? 'positive' : 'warning'}
+      className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-4"
+    >
+      <div className="flex items-center gap-2">
+        {ok ? (
+          <CircleCheck className="text-positive size-4 shrink-0" />
+        ) : (
+          <TriangleAlert className="text-warning size-4 shrink-0" />
+        )}
+        <span className="text-xs font-medium">
+          {ok ? 'החודש מאוזן' : 'החודש עדיין לא מאוזן'}
+        </span>
+      </div>
+
+      <div className="text-fg-muted flex items-center gap-1.5 text-xs">
+        נותר לשייך
+        <b className="tnum text-fg">{formatAgorot(left)}</b>
+      </div>
+      <div className="text-fg-muted flex items-center gap-1.5 text-xs">
+        יתרת משותף
+        <b className="tnum text-fg">{formatAgorot(jointClosing)}</b>
+      </div>
+
+      {unassignedActual > 0 && (
+        <Badge tone="warning">{formatAgorot(unassignedActual)} יצאו בלי שיוך</Badge>
+      )}
+      {uncategorized > 0 && (
+        <Badge tone="negative">{formatAgorot(uncategorized)} בלי קטגוריה</Badge>
+      )}
+
+      <Link to="/run" className="text-brand ms-auto shrink-0 text-xs hover:underline">
+        {ok ? 'פתח את סגירת החודש' : 'תקן בשלב השיוך'}
+      </Link>
+    </Card>
   );
 }
 

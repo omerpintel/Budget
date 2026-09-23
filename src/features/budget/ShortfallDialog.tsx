@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Field, MoneyInput, Select } from '@/components/ui/Field';
 import { formatAgorot, parseMoneyInput } from '@/lib/money';
@@ -34,12 +34,15 @@ export function ShortfallDialog({
     w.kind === 'personal' ? `הארנק של ${personName(w.person_id)}` : w.name;
 
   return (
-    <Card className="border-negative/40">
-      <CardHeader
-        title={`הכרית המשותפת עומדת על ${formatAgorot(-shortfall)}`}
-        description="אפשר להעביר כסף כדי לכסות את הגירעון, או לגלגל אותו לחודש הבא. לגלגל זו בחירה לגיטימית — הכרית פשוט תיפתח במינוס."
-      />
-      <CardBody className="space-y-3">
+    <Modal
+      open
+      tone="negative"
+      dismissable={false}
+      onOpenChange={(next) => !next && onCarry()}
+      title={`הכרית המשותפת עומדת על ${formatAgorot(-shortfall)}`}
+      description="אפשר להעביר כסף כדי לכסות את הגירעון, או לגלגל אותו לחודש הבא. לגלגל זו בחירה לגיטימית — הכרית פשוט תיפתח במינוס."
+    >
+      <div className="space-y-3">
         <div className="border-negative/30 bg-negative/5 flex items-start gap-2.5 rounded-lg border p-3">
           <AlertTriangle className="text-negative mt-px size-4 shrink-0" />
           <p className="text-xs leading-relaxed">
@@ -62,7 +65,8 @@ export function ShortfallDialog({
             <MoneyInput value={amountRaw} onChange={(e) => setAmountRaw(e.target.value)} />
           </Field>
           <Button
-            disabled={busy || amount <= 0 || !fromWalletId}
+            loading={busy}
+            disabled={amount <= 0 || !fromWalletId}
             onClick={async () => {
               setBusy(true);
               try {
@@ -81,7 +85,7 @@ export function ShortfallDialog({
             גלגל את הגירעון לחודש הבא
           </Button>
         </div>
-      </CardBody>
-    </Card>
+      </div>
+    </Modal>
   );
 }

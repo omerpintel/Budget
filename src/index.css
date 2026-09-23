@@ -8,11 +8,14 @@
   --font-sans: 'Heebo Variable', 'Inter Variable', system-ui, sans-serif;
   --font-hebrew: 'Heebo Variable', 'Inter Variable', system-ui, sans-serif;
 
-  --radius-card: 0.75rem;
+  --radius-card: 1rem;
+  --radius-field: 0.625rem;
+  --radius-pill: 999px;
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-fg: var(--fg);
   --color-fg-muted: var(--fg-muted);
   --color-fg-subtle: var(--fg-subtle);
@@ -30,35 +33,69 @@
   --color-positive: var(--positive);
   --color-negative: var(--negative);
   --color-warning: var(--warning);
+
+  /* Aliases so drop-in shadcn/radix components inherit this palette unchanged. */
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--brand);
+  --color-primary-foreground: var(--brand-fg);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--fg-muted);
+  --color-accent: var(--surface-2);
+  --color-accent-foreground: var(--fg);
+  --color-destructive: var(--negative);
+  --color-destructive-foreground: var(--brand-fg);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--brand);
+
+  --shadow-e1: var(--elev-1);
+  --shadow-e2: var(--elev-2);
+  --shadow-e3: var(--elev-3);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.32, 0.64, 1);
 }
 
 :root {
-  --bg: oklch(0.99 0.002 265);
+  --bg: oklch(0.985 0.003 265);
   --surface: oklch(1 0 0);
-  --surface-2: oklch(0.972 0.003 265);
+  --surface-2: oklch(0.968 0.004 265);
+  --surface-3: oklch(0.945 0.005 265);
   --fg: oklch(0.21 0.01 265);
-  --fg-muted: oklch(0.5 0.012 265);
-  --fg-subtle: oklch(0.65 0.01 265);
-  --line: oklch(0.92 0.004 265);
-  --line-strong: oklch(0.86 0.006 265);
+  --fg-muted: oklch(0.48 0.013 265);
+  --fg-subtle: oklch(0.62 0.011 265);
+  --line: oklch(0.915 0.005 265);
+  --line-strong: oklch(0.85 0.007 265);
 
   --brand: oklch(0.55 0.14 250);
   --brand-fg: oklch(0.99 0 0);
 
-  --joint: oklch(0.62 0.12 195);
-  --savings: oklch(0.63 0.14 155);
-  --omer: oklch(0.58 0.16 275);
-  --roni: oklch(0.63 0.17 5);
+  --joint: oklch(0.6 0.12 195);
+  --savings: oklch(0.6 0.14 155);
+  --omer: oklch(0.55 0.16 275);
+  --roni: oklch(0.6 0.17 5);
 
-  --positive: oklch(0.6 0.14 150);
-  --negative: oklch(0.58 0.19 22);
-  --warning: oklch(0.72 0.15 75);
+  --positive: oklch(0.56 0.14 150);
+  --negative: oklch(0.55 0.2 22);
+  --warning: oklch(0.62 0.14 75);
+
+  --elev-1: 0 1px 2px oklch(0.21 0.01 265 / 0.05);
+  --elev-2: 0 2px 4px oklch(0.21 0.01 265 / 0.05), 0 8px 20px oklch(0.21 0.01 265 / 0.06);
+  --elev-3: 0 4px 8px oklch(0.21 0.01 265 / 0.06), 0 20px 48px oklch(0.21 0.01 265 / 0.1);
 }
 
 .dark {
-  --bg: oklch(0.17 0.006 265);
-  --surface: oklch(0.21 0.007 265);
+  --bg: oklch(0.16 0.006 265);
+  --surface: oklch(0.205 0.007 265);
   --surface-2: oklch(0.25 0.008 265);
+  --surface-3: oklch(0.29 0.009 265);
   --fg: oklch(0.96 0.003 265);
   --fg-muted: oklch(0.71 0.012 265);
   --fg-subtle: oklch(0.56 0.012 265);
@@ -76,6 +113,10 @@
   --positive: oklch(0.72 0.14 150);
   --negative: oklch(0.68 0.17 22);
   --warning: oklch(0.79 0.14 75);
+
+  --elev-1: 0 1px 2px oklch(0 0 0 / 0.3);
+  --elev-2: 0 2px 4px oklch(0 0 0 / 0.3), 0 8px 20px oklch(0 0 0 / 0.35);
+  --elev-3: 0 4px 8px oklch(0 0 0 / 0.35), 0 20px 48px oklch(0 0 0 / 0.5);
 }
 
 @layer base {
@@ -89,12 +130,39 @@
     height: 100%;
   }
 
+  /* Without a reserved gutter, content that lands exactly on the overflow
+     threshold toggles the scrollbar every frame and the layout jitters. */
+  .scroll-y {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
   body {
     background-color: var(--bg);
     color: var(--fg);
     font-family: var(--font-sans);
     font-feature-settings: 'cv11', 'ss01';
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Theme flips would otherwise repaint as a hard cut across the whole window. */
+  html.theme-transition,
+  html.theme-transition * {
+    transition:
+      background-color 180ms var(--ease-out-soft),
+      border-color 180ms var(--ease-out-soft),
+      color 180ms var(--ease-out-soft);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Money and any figure that must align in a column. */
@@ -109,6 +177,41 @@
   /* Arrows that express direction of travel; the layout is RTL so they mirror. */
   .dir-icon {
     transform: scaleX(-1);
+  }
+
+  @keyframes rise-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .anim-rise {
+    animation: rise-in 160ms var(--ease-out-soft) both;
+  }
+
+  @keyframes overlay-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -48%) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
   }
 
   ::-webkit-scrollbar {

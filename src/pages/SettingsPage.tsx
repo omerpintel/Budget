@@ -5,6 +5,9 @@ import { PageHeader } from '@/components/ui/Feedback';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Select } from '@/components/ui/Field';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { useTheme } from '@/state/theme';
 import { getAllSettings, setSetting, SETTING_KEYS } from '@/data/settings';
 import { listAccounts, getLatestDebitDay } from '@/data/accounts';
 import { listPeople } from '@/data/people';
@@ -20,6 +23,7 @@ import { ISSUERS } from '@/data/types';
 export function SettingsPage() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { theme } = useTheme();
   const [status, setStatus] = useState<OllamaStatus | null>(null);
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -71,8 +75,30 @@ export function SettingsPage() {
     <>
       <PageHeader title="הגדרות" description="הגדרות מקומיות. שום דבר לא עוזב את המחשב הזה." />
 
-      <div className="space-y-4">
-        <Card>
+      <Tabs defaultValue="general">
+        <TabsList>
+          <TabsTrigger value="general">כללי</TabsTrigger>
+          <TabsTrigger value="ai">בינה מלאכותית</TabsTrigger>
+          <TabsTrigger value="accounts">חשבונות</TabsTrigger>
+          <TabsTrigger value="categories">קטגוריות וכללים</TabsTrigger>
+          <TabsTrigger value="data">נתונים</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="general">
+          <Card variant="elevated">
+            <CardHeader
+              title="מראה"
+              description="ערכת הנושא נשמרת על המחשב הזה ונטענת לפני שהמסך מצטייר."
+              action={<ThemeToggle />}
+            />
+            <CardBody>
+              <p className="text-fg-subtle text-xs">
+                כרגע במצב {theme === 'dark' ? 'כהה' : 'בהיר'}.
+              </p>
+            </CardBody>
+          </Card>
+
+          <Card variant="elevated">
           <CardHeader
             title="סגירת חודש"
             description="חודשי התקציב הם תמיד חודשי לוח שנה. זה רק קובע מתי תקבל תזכורת להתיישב על זה."
@@ -101,8 +127,10 @@ export function SettingsPage() {
             )}
           </CardBody>
         </Card>
+        </TabsContent>
 
-        <Card>
+        <TabsContent value="ai">
+        <Card variant="elevated">
           <CardHeader
             title="בינה מלאכותית מקומית"
             description="Ollama מסווג בתי עסק חדשים. אם הוא לא זמין האפליקציה עדיין עובדת — הכל נוחת תחת ללא קטגוריה."
@@ -221,8 +249,10 @@ export function SettingsPage() {
               )}
           </CardBody>
         </Card>
+        </TabsContent>
 
-        <Card>
+        <TabsContent value="accounts">
+        <Card variant="elevated">
           <CardHeader
             title="כרטיסים וחשבונות"
             description="הבעלות על הכרטיס קובעת לאיזה ארנק אישי שייכת ההוצאה."
@@ -255,8 +285,10 @@ export function SettingsPage() {
             </table>
           </CardBody>
         </Card>
+        </TabsContent>
 
-        <Card>
+        <TabsContent value="data">
+        <Card variant="elevated">
           <CardHeader
             title="גיבוי"
             description="כל הספרים שלך הם קובץ SQLite אחד. ייצא אותו מדי פעם למקום בטוח."
@@ -289,11 +321,7 @@ export function SettingsPage() {
 
         <SnapshotsCard />
 
-        <CategoriesCard />
-        <RecurringCard />
-        <RulesCard />
-
-        <Card className="border-negative/30">
+        <Card className="border-negative/30" tone="negative">
           <CardHeader
             title="מחיקת הכל"
             description={`מוחק את כל ${counts.transactions} התנועות, ${counts.periods} החודשים ו־${counts.accounts} החשבונות, ומתחיל את ההגדרה מההתחלה. ייצא גיבוי קודם — אי אפשר לבטל את זה.`}
@@ -319,7 +347,14 @@ export function SettingsPage() {
             </Button>
           </CardBody>
         </Card>
-      </div>
+        </TabsContent>
+
+        <TabsContent value="categories">
+          <CategoriesCard />
+          <RecurringCard />
+          <RulesCard />
+        </TabsContent>
+      </Tabs>
     </>
   );
 }

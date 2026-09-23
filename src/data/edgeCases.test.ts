@@ -27,6 +27,8 @@ describe('degenerate inputs', () => {
       fixed: 0,
       jointFlexible: 0,
       savingsFunded: 0,
+      savingsContribution: 0,
+      uncategorized: 0,
       personalSpent: {},
       byCategory: {},
     });

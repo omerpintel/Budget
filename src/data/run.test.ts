@@ -19,6 +19,8 @@ describe('getRunStatus', () => {
       unreviewed: 0,
       committed: false,
       overAllocated: false,
+      unassignedActual: 0,
+      uncategorized: 0,
     });
   });
 

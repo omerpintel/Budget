@@ -7,6 +7,8 @@ const status = (partial: Partial<RunStatus> = {}): RunStatus => ({
   unreviewed: 0,
   committed: false,
   overAllocated: false,
+  unassignedActual: 0,
+  uncategorized: 0,
   ...partial,
 });
 
@@ -62,6 +64,12 @@ describe('isStepComplete', () => {
   it('does not call allocation complete while over-allocated', () => {
     expect(
       isStepComplete(status({ importedBatches: 1, unreviewed: 0, overAllocated: true }), 3),
+    ).toBe(false);
+  });
+
+  it('does not call allocation complete while joint spending has no plan line', () => {
+    expect(
+      isStepComplete(status({ importedBatches: 1, unreviewed: 0, unassignedActual: 18_535_00 }), 3),
     ).toBe(false);
   });
 });

@@ -243,28 +243,30 @@ export function TriagePage({
               </span>
               {lastAction && <span className="text-positive">{lastAction}</span>}
             </div>
-            <div className="bg-surface-2 h-1 overflow-hidden rounded-full">
+            <div className="bg-surface-2 h-1.5 overflow-hidden rounded-full">
               <div
-                className="bg-brand h-full transition-all"
+                className="bg-brand h-full rounded-full transition-[width] duration-500 ease-[var(--ease-out-soft)]"
                 style={{ width: `${total === 0 ? 0 : (auto.length / total) * 100}%` }}
               />
             </div>
           </div>
 
           {current && draft ? (
-            <TriageCard
-              row={current}
-              draft={draft}
-              quick={quick}
-              categories={categories}
-              canFundFromSavings={savingsWalletId !== null}
-              position={{ index, total: queue.length }}
-              onDraft={setDraft}
-              onCommit={() => void commit(current, draft)}
-              onMove={(delta) =>
-                setIndex((i) => Math.min(Math.max(i + delta, 0), queue.length - 1))
-              }
-            />
+            <div key={current.id} className="anim-rise">
+              <TriageCard
+                row={current}
+                draft={draft}
+                quick={quick}
+                categories={categories}
+                canFundFromSavings={savingsWalletId !== null}
+                position={{ index, total: queue.length }}
+                onDraft={setDraft}
+                onCommit={() => void commit(current, draft)}
+                onMove={(delta) =>
+                  setIndex((i) => Math.min(Math.max(i + delta, 0), queue.length - 1))
+                }
+              />
+            </div>
           ) : (
             <Card>
               <EmptyState

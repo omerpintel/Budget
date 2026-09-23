@@ -37,11 +37,13 @@ export function PageHeader({
 }) {
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-      <div className="min-w-0 flex-1">
+      {/* basis keeps the description on readable lines; without it a wide action
+          group wins the flex negotiation and squeezes the text to one word wide. */}
+      <div className="min-w-0 flex-1 basis-72">
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {description ? <p className="text-fg-muted mt-1 text-sm">{description}</p> : null}
       </div>
-      {action}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </header>
   );
 }

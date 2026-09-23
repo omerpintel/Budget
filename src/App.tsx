@@ -1,12 +1,14 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createHashRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { DirectionProvider } from '@radix-ui/react-direction';
 import { initDb } from '@/db';
 import { getSetting, SETTING_KEYS } from '@/data/settings';
 import { autoSnapshot } from '@/data/snapshots';
 import { AppShell } from '@/components/layout/AppShell';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { PeriodProvider } from '@/state/period';
+import { ThemeProvider } from '@/state/theme';
 import { DashboardPage } from '@/pages/DashboardPage';
 
 // Everything except the dashboard loads on demand; the SQLite worker is already
@@ -109,10 +111,14 @@ export function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <PeriodProvider>
-        <RouterProvider router={router} />
-      </PeriodProvider>
-    </QueryClientProvider>
+    <DirectionProvider dir="rtl">
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <PeriodProvider>
+            <RouterProvider router={router} />
+          </PeriodProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </DirectionProvider>
   );
 }

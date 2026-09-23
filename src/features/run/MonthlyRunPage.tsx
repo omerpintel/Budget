@@ -24,6 +24,7 @@ import { ImportHistory } from '@/features/import/ImportHistory';
 import { TriagePage } from '@/features/triage/TriagePage';
 import { AutoCategorize } from '@/features/triage/AutoCategorize';
 import { ShortfallDialog } from '@/features/budget/ShortfallDialog';
+import { SurplusDialog } from '@/features/budget/SurplusDialog';
 import { AllocationPlanner } from '@/features/budget/AllocationPlanner';
 import { TransfersCard } from '@/features/budget/TransfersCard';
 import { ensurePeriod, findPeriod } from '@/data/periods';
@@ -31,6 +32,7 @@ import { listImportHistory } from '@/data/imports';
 import {
   deriveStep,
   getRunStatus,
+  isStepComplete,
   listManualOutflows,
   materializeRecurring,
   RUN_STEPS,
@@ -52,6 +54,18 @@ import { ensureManualAccount } from '@/data/accounts';
 import { formatAgorot, parseMoneyInput, periodLabel, toMajor } from '@/lib/money';
 import { usePeriod } from '@/state/period';
 import { cn } from '@/lib/utils';
+import type { RunStatus } from '@/data/runModel';
+
+function allocationBlockReason(status: RunStatus): string | undefined {
+  if (status.overAllocated) return 'התקציב שויך יותר ממה שיש. אזן אותו לפני שממשיכים.';
+  if (status.uncategorized > 0)
+    return `${formatAgorot(status.uncategorized)} בהוצאות עדיין בלי קטגוריה. חזור לשלב המיון.`;
+  if (status.unassignedActual > 0)
+    return `${formatAgorot(status.unassignedActual)} יצאו מהמשותף בלי שיוך. לחץ ״מלא לפי בפועל״.`;
+  if (status.unassignedActual < 0)
+    return `שויכו ${formatAgorot(-status.unassignedActual)} יותר ממה שבאמת יצא.`;
+  return undefined;
+}
 
 export function MonthlyRunPage() {
   const qc = useQueryClient();
@@ -123,7 +137,7 @@ export function MonthlyRunPage() {
         }
       />
 
-      <div className="mb-6">
+      <div className="bg-bg/85 sticky top-0 z-20 -mx-7 mb-6 px-7 pt-1 pb-3 backdrop-blur-sm">
         <Stepper
           steps={[...RUN_STEPS]}
           current={step}
@@ -132,18 +146,20 @@ export function MonthlyRunPage() {
         />
       </div>
 
-      {step === 0 && <BankStep periodId={period.id} periodRef={ref} onChanged={invalidate} />}
-      {step === 1 && <ImportStep periodId={period.id} />}
-      {step === 2 && <TriageStep periodId={period.id} unreviewed={status.unreviewed} />}
-      {step === 3 && <AllocationPlanner periodId={period.id} disabled={status.committed} />}
-      {step === 4 && (
-        <ReconcileStep
-          periodId={period.id}
-          committed={status.committed}
-          overAllocated={status.overAllocated}
-          onChanged={invalidate}
-        />
-      )}
+      <div key={step} className="anim-rise">
+        {step === 0 && <BankStep periodId={period.id} periodRef={ref} onChanged={invalidate} />}
+        {step === 1 && <ImportStep periodId={period.id} />}
+        {step === 2 && <TriageStep periodId={period.id} unreviewed={status.unreviewed} />}
+        {step === 3 && <AllocationPlanner periodId={period.id} disabled={status.committed} />}
+        {step === 4 && (
+          <ReconcileStep
+            periodId={period.id}
+            committed={status.committed}
+            overAllocated={status.overAllocated}
+            onChanged={invalidate}
+          />
+        )}
+      </div>
 
       <div className="mt-5 flex items-center justify-between">
         <Button
@@ -156,8 +172,8 @@ export function MonthlyRunPage() {
         {step < RUN_STEPS.length - 1 && (
           <Button
             onClick={() => setManualStep(Math.min(step + 1, RUN_STEPS.length - 1))}
-            disabled={step === 3 && status.overAllocated}
-            title={step === 3 && status.overAllocated ? 'התקציב שויך יותר ממה שיש. אזן אותו לפני שממשיכים.' : undefined}
+            disabled={step === 3 && !isStepComplete(status, 3) && !status.committed}
+            title={step === 3 ? allocationBlockReason(status) : undefined}
           >
             המשך <ArrowRight className="dir-icon size-4" />
           </Button>
@@ -462,6 +478,7 @@ function ReconcileStep({
   onChanged: () => void;
 }) {
   const [carried, setCarried] = useState(false);
+  const [surplusHandled, setSurplusHandled] = useState(false);
 
   const { data } = useQuery({
     queryKey: ['run-reconcile', periodId],
@@ -543,6 +560,27 @@ function ReconcileStep({
               amount,
               reason: 'כיסוי גירעון',
             });
+            onChanged();
+          }}
+        />
+      )}
+
+      {result.joint.closing > 0 && !surplusHandled && jointWallet && !committed && (
+        <SurplusDialog
+          surplus={result.joint.closing}
+          wallets={wallets}
+          jointWalletId={jointWallet.id}
+          personName={personName}
+          onKeep={() => setSurplusHandled(true)}
+          onMove={async (toWalletId, amount) => {
+            await addTransfer({
+              periodId,
+              fromWalletId: jointWallet.id,
+              toWalletId,
+              amount,
+              reason: 'העברת עודף',
+            });
+            setSurplusHandled(true);
             onChanged();
           }}
         />

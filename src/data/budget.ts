@@ -1,6 +1,7 @@
 import { getDb } from '@/db';
 import { nowIso, uuid } from '@/lib/utils';
 import { leftToAssign, type PlanLine } from '@/services/budget/engine';
+import { loadActuals } from './periodEngine';
 
 export interface BudgetLineRow {
   id: string;
@@ -231,8 +232,7 @@ export async function removeIncome(id: string): Promise<void> {
 }
 
 /** Copies last period's plan forward so a new month starts from something sensible. */
-export async function seedPlanFromPrevious(periodId: string): Promise<number> {
-  const db = getDb();
+export async function seedPlanFromPrevious(periodId: string): Promise<number> {  const db = getDb();
   const period = (
     await db.select<{ year: number; month: number }>(
       'SELECT year, month FROM budget_periods WHERE id = ?',
@@ -269,4 +269,101 @@ export async function seedPlanFromPrevious(periodId: string): Promise<number> {
   ]);
 
   return lines.length + allowances.length;
+}
+
+/**
+ * Fills the plan with what the month actually cost. The מחזור חודשי is
+ * retrospective — by the time you reach שיוך the money is already gone — so a
+ * plan of zeros just means "nothing assigned yet", which is what made נותר לשייך
+ * show the entire income while the משותף buffer had long since been drained.
+ *
+ * Lines the user already touched are left alone; only untouched zeros are filled.
+ */
+export async function seedPlanFromActuals(periodId: string): Promise<number> {
+  const [actuals, existing] = await Promise.all([
+    loadActuals(periodId),
+    listBudgetLines(periodId),
+  ]);
+
+  const edited = new Set(existing.filter((l) => l.planned_amount !== 0).map((l) => l.category_id));
+  const amounts = Object.fromEntries(
+    Object.entries(actuals.byCategory).filter(([categoryId, amount]) => {
+      if (edited.has(categoryId)) return false;
+      return amount > 0;
+    }),
+  );
+
+  await setBudgetLines(periodId, amounts);
+  return Object.keys(amounts).length;
+}
+
+export interface PeriodReconciliation extends AvailableToAssign {
+  /** Closing balance of the joint buffer — the real cash left in משותף. */
+  jointClosing: number;
+  transfersIn: number;
+  transfersOut: number;
+  /** Everything that left the joint pot this month, plan-independent. */
+  jointOutflow: number;
+  /** Joint spending no plan line covers yet. Zero means the month adds up. */
+  unassignedActual: number;
+  /** Joint spending still without a category, so it cannot be assigned at all. */
+  uncategorized: number;
+  balanced: boolean;
+}
+
+/**
+ * Ties the שיוך screen to the משותף wallet. Once every shekel that left the joint
+ * pot has a plan line, `left` and `jointClosing` are the same number — that is the
+ * check that the month is closed honestly, not just that nothing went negative.
+ */
+export async function reconcilePeriod(periodId: string): Promise<PeriodReconciliation> {
+  const db = getDb();
+  const [available, actuals, allowanceRows, ledger, transferRows] = await Promise.all([
+    availableToAssign(periodId),
+    loadActuals(periodId),
+    listPersonalBudgets(periodId),
+    db.select<{ closing: number }>(
+      `SELECT l.closing FROM wallet_ledger l
+       JOIN wallets w ON w.id = l.wallet_id
+       WHERE l.period_id = ? AND w.kind = 'joint_buffer'`,
+      [periodId],
+    ),
+    db.select<{ direction: string; amount: number }>(
+      `SELECT CASE WHEN f.kind = 'joint_buffer' THEN 'out' ELSE 'in' END AS direction, t.amount
+       FROM wallet_transfers t
+       LEFT JOIN wallets f ON f.id = t.from_wallet_id
+       LEFT JOIN wallets tw ON tw.id = t.to_wallet_id
+       WHERE t.period_id = ? AND (f.kind = 'joint_buffer' OR tw.kind = 'joint_buffer')`,
+      [periodId],
+    ),
+  ]);
+
+  const transfersIn = transferRows
+    .filter((t) => t.direction === 'in')
+    .reduce((s, t) => s + t.amount, 0);
+  const transfersOut = transferRows
+    .filter((t) => t.direction === 'out')
+    .reduce((s, t) => s + t.amount, 0);
+
+  const allowanceTotal = allowanceRows.reduce((s, a) => s + a.allowance, 0);
+  const plannedSavings = (await listBudgetLines(periodId))
+    .filter((l) => l.kind === 'savings')
+    .reduce((s, l) => s + l.planned_amount, 0);
+  const savingsMoved = actuals.savingsContribution || plannedSavings;
+
+  const jointOutflow = actuals.fixed + actuals.jointFlexible + savingsMoved + allowanceTotal;
+  const jointClosing =
+    ledger[0]?.closing ??
+    available.carryover + actuals.income + transfersIn - jointOutflow - transfersOut;
+
+  return {
+    ...available,
+    jointClosing,
+    transfersIn,
+    transfersOut,
+    jointOutflow,
+    unassignedActual: jointOutflow - available.assigned,
+    uncategorized: actuals.uncategorized,
+    balanced: jointOutflow - available.assigned === 0,
+  };
 }

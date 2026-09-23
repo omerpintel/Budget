@@ -1,9 +1,9 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { periodLabel } from '@/lib/money';
+import { periodLabel, periodKey } from '@/lib/money';
 import { usePeriod, shiftPeriod } from '@/state/period';
 
 const ARROW =
-  'flex size-7 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg';
+  'flex size-7 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg';
 
 export function PeriodSwitcher() {
   const { ref, isCurrent, shiftBy, goToCurrent } = usePeriod();
@@ -11,18 +11,24 @@ export function PeriodSwitcher() {
   const next = shiftPeriod(ref, 1);
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="border-line bg-surface-2/50 flex items-center gap-1 rounded-[var(--radius-pill)] border px-1 py-1">
       <button
         type="button"
         onClick={() => shiftBy(-1)}
         aria-label={`מעבר ל${periodLabel(prev.year, prev.month)}`}
         className={ARROW}
       >
+        {/* RTL: earlier months sit to the right, so back points right. */}
         <ChevronRight className="size-4" strokeWidth={2} />
       </button>
 
-      <div className="flex min-w-[9.5rem] flex-col items-center leading-none">
-        <span className="text-[13px] font-semibold tracking-tight">
+      <div className="relative flex min-w-[9.5rem] flex-col items-center overflow-hidden leading-none">
+        {/* Keyed remount replays the CSS fade. AnimatePresence/popLayout here kept
+            layout projection running every frame and jittered the whole shell. */}
+        <span
+          key={periodKey(ref.year, ref.month)}
+          className="anim-rise text-[13px] font-semibold tracking-tight"
+        >
           {periodLabel(ref.year, ref.month)}
         </span>
         {isCurrent ? (
